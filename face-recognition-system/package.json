@@ -1,0 +1,19 @@
+{
+  "name": "face-recognition-system",
+  "version": "1.0.0",
+  "description": "Advanced Local Face Recognition System",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8080",
+    "dev": "python -m http.server 8080"
+  },
+  "keywords": [
+    "face-recognition",
+    "local-storage",
+    "mediapipe",
+    "opencv",
+    "javascript"
+  ],
+  "author": "Eventra Team",
+  "license": "MIT"
+}

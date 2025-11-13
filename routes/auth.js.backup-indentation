@@ -1,0 +1,671 @@
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const { auth } = require('../middleware/auth');
+  const emailVerificationService = require('../utils/emailVerification');
+  const { storeFaceData, verifyFace } = require('../utils/advancedFaceRecognition');
+
+    const router = express.Router();
+
+    // Register new user
+    router.post('/register', async (req, res) => {
+      try {
+        const { name, email, password, studentId, institute, dateOfBirth, phoneNumber, interests } = req.body;
+
+          // Basic input validation
+          if (!name || !email || !password || !studentId || !institute || !dateOfBirth || !phoneNumber) {
+            return res.status(400).json({ message: 'Missing required fields' });
+            }
+
+            const dob = new Date(dateOfBirth);
+            if (isNaN(dob.getTime())) {
+              return res.status(400).json({ message: 'Invalid date of birth format' });
+              }
+
+              // Check if user already exists
+              const existingUser = await User.findOne({
+                $or: [{ email }, { studentId }, { phoneNumber }]
+                });
+
+                if (existingUser) {
+                  return res.status(400).json({
+                    message: 'User with this email, student ID, or phone number already exists'
+                  });
+                }
+
+                // Create new user
+                const user = new User({
+                  name,
+                  email,
+                  password,
+                  studentId,
+                  institute,
+                  dateOfBirth: dob,
+                  phoneNumber,
+                  interests: interests || []
+                });
+
+                await user.save();
+
+                // Send verification email (don't fail registration if email sending fails)
+                let emailSent = true;
+                try {
+                  const token = emailVerificationService.generateVerificationToken(user.email);
+                  user.verificationToken = token;
+                  await user.save();
+
+                  const result = await emailVerificationService.sendVerificationEmail(user.email, token);
+                  if (!result.success) {
+                    emailSent = false;
+                  }
+                  } catch (emailError) {
+                    emailSent = false;
+                    console.error('Verification email error:', emailError);
+                  }
+
+                  res.status(201).json({
+                    message: emailSent
+                    ? 'Registration successful. Please check your email for verification.'
+                    : 'Registration successful. We could not send a verification email at this time. Please try verifying later.',
+                    emailSent,
+                    user: {,
+                      id: user._id,
+                      name: user.name,
+                      email: user.email,
+                      studentId: user.studentId,
+                      institute: user.institute,
+                      role: user.role,
+                      isEmailVerified: user.isEmailVerified,
+                      isFaceVerified: user.isFaceVerified,
+                      faceDataCollected: user.faceDataCollected,
+                      faceTrainingCompleted: user.faceTrainingCompleted,
+                      faceDataQuality: user.faceDataQuality,
+                      faceSampleCount: user.faceSampleCount
+                    }
+                  });
+
+                  } catch (error) {
+                    console.error('Registration error:', error);
+                    // Handle Mongo duplicate key error
+                    if (error.code === 11000) {
+                      return res.status(400).json({ message: 'User with this email or student ID already exists' });
+                      }
+                      // Handle Mongoose validation errors
+                      if (error.name === 'ValidationError') {
+                        return res.status(400).json({ message: error.message });
+                        }
+                        res.status(500).json({ message: 'Registration failed' });
+                        }
+                      });
+
+                      // Login user
+                      router.post('/login', async (req, res) => {
+                        try {
+                          const { email, password } = req.body;
+
+                            // Find user by email or username (for admin)
+                            let user;
+                            if (email === 'adminyadav') {
+                              // Admin login with username
+                              user = await User.findOne({ email: 'adminyadav@eventra.com' }).select('+password');
+                                } else {
+                                  // Regular user login with email
+                                  user = await User.findOne({ email }).select('+password');
+                                  }
+
+                                  if (!user) {
+                                    return res.status(401).json({ message: 'Invalid credentials' });
+                                    }
+
+                                    // Check if user is active
+                                    if (!user.isActive) {
+                                      return res.status(401).json({ message: 'Account is deactivated' });
+                                      }
+
+                                      // Check password
+                                      const isPasswordValid = await user.comparePassword(password);
+                                      if (!isPasswordValid) {
+                                        return res.status(401).json({ message: 'Invalid credentials' });
+                                        }
+
+                                        // Check email verification - allow unverified emails for regular users
+                                        if (!user.isEmailVerified && user.role !== 'admin') {
+                                          // For regular users, allow login but show a warning
+                                          console.log(`User ${user.email} logged in with unverified email`);
+                                          }
+
+                                          // Update last login
+                                          user.lastLogin = new Date();
+                                          await user.save();
+
+                                          // Generate JWT token
+                                          const token = jwt.sign(
+                                          { userId: user._id, role: user.role },
+                                            process.env.JWT_SECRET,
+                                            { expiresIn: '7d' }
+                                              );
+
+                                              res.json({
+                                                message: 'Login successful',
+                                                token,
+                                                user: {,
+                                                  id: user._id,
+                                                  name: user.name,
+                                                  email: user.email,
+                                                  studentId: user.studentId,
+                                                  institute: user.institute,
+                                                  role: user.role,
+                                                  isEmailVerified: user.isEmailVerified,
+                                                  isFaceVerified: user.isFaceVerified,
+                                                  faceDataCollected: user.faceDataCollected,
+                                                  faceDataQuality: user.faceDataQuality,
+                                                  faceSampleCount: user.faceSampleCount,
+                                                  interests: user.interests
+                                                },
+                                                warnings: !user.isEmailVerified && user.role !== 'admin' ?
+                                                ['Your email is not verified. Please check your inbox and verify your email address.'] : []
+                                              });
+
+                                              } catch (error) {
+                                                console.error('Login error:', error);
+                                                res.status(500).json({ message: 'Login failed', error: error.message });
+                                                }
+                                              });
+
+                                              // Verify email
+                                              router.get('/verify-email/:token', async (req, res) => {
+                                                try {
+                                                  const { token } = req.params;
+
+                                                    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_jwt_secret');
+                                                    const user = await User.findById(decoded.userId);
+
+                                                    if (!user) {
+                                                      return res.status(400).json({ message: 'Invalid verification token' });
+                                                      }
+
+                                                      if (user.isEmailVerified) {
+                                                        return res.status(400).json({ message: 'Email already verified' });
+                                                        }
+
+                                                        user.isEmailVerified = true;
+                                                        await user.save();
+
+                                                        res.json({ message: 'Email verified successfully' });
+
+                                                          } catch (error) {
+                                                            console.error('Email verification error:', error);
+                                                            res.status(400).json({ message: 'Invalid or expired verification token' });
+                                                            }
+                                                          });
+
+                                                          // Face verification
+
+                                                          // Enhanced face verification with MongoDB image storage
+                                                          router.post('/verify-face', auth, async (req, res) => {
+                                                            try {
+                                                              const { faceData } = req.body;
+                                                                const user = await User.findById(req.user.userId);
+
+                                                                if (!user) {
+                                                                  return res.status(404).json({ message: 'User not found' });
+                                                                  }
+
+                                                                  console.log('Face verification request for user:', user.email);
+                                                                  console.log('User face data status:', {
+                                                                    faceDataCollected: user.faceDataCollected,
+                                                                    isFaceVerified: user.isFaceVerified,
+                                                                    faceSampleCount: user.faceSampleCount
+                                                                  });
+
+                                                                  // If user doesn't have face data collected yet, this is first-time setup
+                                                                  if (!user.faceDataCollected) {
+                                                                    // For first-time setup, we need to collect face samples first
+                                                                    return res.status(400).json({
+                                                                      message: 'No face data collected. Please collect face samples first.',
+                                                                      requiresSetup: true,
+                                                                      user: {,
+                                                                        id: user._id,
+                                                                        email: user.email,
+                                                                        faceDataCollected: user.faceDataCollected,
+                                                                        isFaceVerified: user.isFaceVerified
+                                                                      }
+                                                                    });
+                                                                  }
+
+                                                                  // Check if face is already verified
+                                                                  if (user.isFaceVerified) {
+                                                                    console.log('Face already verified for user:', user.email);
+                                                                    return res.status(400).json({
+                                                                      message: 'Face already verified',
+                                                                      user: {,
+                                                                        id: user._id,
+                                                                        email: user.email,
+                                                                        faceDataCollected: user.faceDataCollected,
+                                                                        isFaceVerified: user.isFaceVerified,
+                                                                        faceSampleCount: user.faceSampleCount,
+                                                                        faceTrainingDate: user.faceTrainingDate
+                                                                      }
+                                                                    });
+                                                                  }
+
+                                                                  // User has stored face data, verify against it
+                                                                  console.log('Verifying face against stored data...');
+                                                                  const verificationResult = await verifyFace(faceData, req.user.userId);
+
+                                                                  console.log('Verification result:', verificationResult);
+
+                                                                  if (verificationResult.success && verificationResult.isMatch && verificationResult.confidence > 70) {
+                                                                    // Update user verification status
+                                                                    user.isFaceVerified = true;
+                                                                    user.faceVerificationDate = new Date();
+                                                                    user.faceVerificationConfidence = verificationResult.confidence;
+                                                                    await user.save();
+
+                                                                    console.log('Face verification successful for user:', user.email);
+
+                                                                    res.json({
+                                                                      message: 'Face verification successful',
+                                                                      confidence: verificationResult.confidence,
+                                                                      isFirstTime: false,
+                                                                      user: {,
+                                                                        id: user._id,
+                                                                        email: user.email,
+                                                                        faceDataCollected: user.faceDataCollected,
+                                                                        isFaceVerified: user.isFaceVerified,
+                                                                        faceSampleCount: user.faceSampleCount,
+                                                                        faceVerificationDate: user.faceVerificationDate,
+                                                                        faceVerificationConfidence: user.faceVerificationConfidence
+                                                                      }
+                                                                    });
+                                                                    } else {
+                                                                      console.log('Face verification failed for user:', user.email);
+                                                                      res.status(400).json({
+                                                                        message: 'Face verification failed',
+                                                                        confidence: verificationResult.confidence || 0,
+                                                                        details: verificationResult.message || 'Face did not match stored data'
+                                                                      });
+                                                                    }
+
+                                                                    } catch (error) {
+                                                                      console.error('Face verification error:', error);
+                                                                      res.status(500).json({
+                                                                        message: 'Face verification failed',
+                                                                        error: error.message
+                                                                      });
+                                                                    }
+                                                                  });
+
+                                                                  // Update face data
+                                                                  router.post('/update-face', auth, async (req, res) => {
+                                                                    try {
+                                                                      const { faceSamples } = req.body;
+                                                                        const user = await User.findById(req.user.userId);
+
+                                                                        if (!user) {
+                                                                          return res.status(404).json({ message: 'User not found' });
+                                                                          }
+
+                                                                          // Use the new MongoDB-based face data collection
+                                                                          if (!faceSamples || !Array.isArray(faceSamples) || faceSamples.length < 5) {
+                                                                            return res.status(400).json({
+                                                                              message: 'At least 5 face samples are required for training'
+                                                                            });
+                                                                          }
+
+                                                                          const result = await storeFaceData(req.user.userId, faceSamples);
+
+                                                                          if (result.success) {
+                                                                            res.json({
+                                                                              message: 'Face data updated successfully',
+                                                                              sampleCount: result.sampleCount
+                                                                            });
+                                                                            } else {
+                                                                              res.status(400).json({
+                                                                                message: result.message
+                                                                              });
+                                                                            }
+
+                                                                            } catch (error) {
+                                                                              console.error('Face update error:', error);
+                                                                              res.status(500).json({ message: 'Face update failed', error: error.message });
+                                                                              }
+                                                                            });
+
+                                                                            // Get current user
+                                                                            router.get('/me', auth, async (req, res) => {
+                                                                              try {
+                                                                                const user = await User.findById(req.user.userId);
+                                                                                if (!user) {
+                                                                                  return res.status(404).json({ message: 'User not found' });
+                                                                                  }
+
+                                                                                  res.json({
+                                                                                    user: {,
+                                                                                      id: user._id,
+                                                                                      name: user.name,
+                                                                                      email: user.email,
+                                                                                      studentId: user.studentId,
+                                                                                      institute: user.institute,
+                                                                                      dateOfBirth: user.dateOfBirth,
+                                                                                      profilePicture: user.profilePicture,
+                                                                                      phoneNumber: user.phoneNumber,
+                                                                                      isEmailVerified: user.isEmailVerified,
+                                                                                      isFaceVerified: user.isFaceVerified,
+                                                                                      interests: user.interests,
+                                                                                      role: user.role,
+                                                                                      lastLogin: user.lastLogin
+                                                                                    }
+                                                                                  });
+
+                                                                                  } catch (error) {
+                                                                                    console.error('Get user error:', error);
+                                                                                    res.status(500).json({ message: 'Failed to get user data', error: error.message });
+                                                                                    }
+                                                                                  });
+
+                                                                                  // Update profile
+                                                                                  router.put('/profile', auth, async (req, res) => {
+                                                                                    try {
+                                                                                      console.log('Profile update request:', req.body);
+                                                                                      console.log('Profile update request keys:', Object.keys(req.body));
+                                                                                      console.log('Profile update request values:', Object.values(req.body));
+
+                                                                                      const {
+                                                                                        name,
+                                                                                        phoneNumber,
+                                                                                        interests,
+                                                                                        profilePicture,
+                                                                                        bio,
+                                                                                        gender,
+                                                                                        dateOfBirth,
+                                                                                        institute,
+                                                                                        role,
+                                                                                        socialLinks,
+                                                                                        notificationPreferences,
+                                                                                        privacySettings
+                                                                                      } = req.body;
+
+                                                                                      const user = await User.findById(req.user.userId);
+
+                                                                                      if (!user) {
+                                                                                        return res.status(404).json({ message: 'User not found' });
+                                                                                        }
+
+                                                                                        // Update allowed fields with safe assignment
+                                                                                        if (name !== undefined) user.name = name;
+                                                                                        if (phoneNumber !== undefined) {
+                                                                                          // Check if phone number is already taken by another user
+                                                                                          if (phoneNumber !== user.phoneNumber) {
+                                                                                            const existingUser = await User.findOne({ phoneNumber, _id: { $n,
+                                                                                            e: user._id } });
+                                                                                            if (existingUser) {
+                                                                                              return res.status(400).json({ message: 'Phone number is already taken by another user' });
+                                                                                              }
+                                                                                            }
+                                                                                            user.phoneNumber = phoneNumber;
+                                                                                          }
+                                                                                          if (interests !== undefined) {
+                                                                                            // Validate interests against enum values
+                                                                                            const validInterests = ['Technology', 'Sports', 'Music', 'Art', 'Business', 'Science', 'Literature', 'Gaming', 'Photography', 'Dance'];
+                                                                                            const invalidInterests = interests.filter(interest => !validInterests.includes(interest));
+                                                                                            if (invalidInterests.length > 0) {
+                                                                                              return res.status(400).json({
+                                                                                                message: 'Invalid interests',
+                                                                                                invalidInterests: invalidInterests,
+                                                                                                validInterests: validInterests
+                                                                                              });
+                                                                                            }
+                                                                                            user.interests = interests;
+                                                                                          }
+                                                                                          if (profilePicture !== undefined) user.profilePicture = profilePicture;
+                                                                                          if (bio !== undefined) user.bio = bio;
+                                                                                          if (gender !== undefined) user.gender = gender;
+                                                                                          if (dateOfBirth !== undefined) {
+                                                                                            console.log('Date of birth received:', dateOfBirth);
+                                                                                            const dob = new Date(dateOfBirth);
+                                                                                            console.log('Parsed date of birth:', dob);
+                                                                                            if (isNaN(dob.getTime())) {
+                                                                                              console.log('Invalid date of birth format');
+                                                                                              return res.status(400).json({ message: 'Invalid date of birth format' });
+                                                                                              }
+                                                                                              user.dateOfBirth = dob;
+                                                                                            }
+                                                                                            if (institute !== undefined) user.institute = institute;
+                                                                                            // Only allow role changes for admin users
+                                                                                            if (role !== undefined && req.user.role === 'admin') {
+                                                                                              user.role = role;
+                                                                                            }
+                                                                                            if (socialLinks !== undefined) user.socialLinks = socialLinks;
+                                                                                            if (notificationPreferences !== undefined) user.notificationPreferences = notificationPreferences;
+                                                                                            if (privacySettings !== undefined) {
+                                                                                              // Validate profileVisibility
+                                                                                              if (privacySettings.profileVisibility) {
+                                                                                                const validVisibility = ['public', 'friends', 'private'];
+                                                                                                if (!validVisibility.includes(privacySettings.profileVisibility)) {
+                                                                                                  return res.status(400).json({
+                                                                                                    message: 'Invalid profile visibility',
+                                                                                                    value: privacySettings.profileVisibility,
+                                                                                                    validValues: validVisibility
+                                                                                                  });
+                                                                                                }
+                                                                                              }
+                                                                                              user.privacySettings = privacySettings;
+                                                                                            }
+
+                                                                                            console.log('User before save:', user.toObject());
+
+                                                                                            // Validate the user before saving
+                                                                                            try {
+                                                                                              await user.validate();
+                                                                                              } catch (validationError) {
+                                                                                                console.error('Validation error:', validationError);
+                                                                                                console.error('Validation errors details:', validationError.errors);
+                                                                                                return res.status(400).json({
+                                                                                                  message: 'Validation failed',
+                                                                                                  errors: validationError.errors,
+                                                                                                  details: Object.keys(validationError.errors).map(key => ({,
+                                                                                                    field: key,
+                                                                                                    message: validationError.errors[key].message,
+                                                                                                    value: validationError.errors[key].value
+                                                                                                  }))
+                                                                                                });
+                                                                                              }
+
+                                                                                              await user.save();
+                                                                                              console.log('User saved successfully');
+
+                                                                                              res.json({
+                                                                                                message: 'Profile updated successfully',
+                                                                                                user: {,
+                                                                                                  id: user._id,
+                                                                                                  name: user.name,
+                                                                                                  email: user.email,
+                                                                                                  studentId: user.studentId,
+                                                                                                  institute: user.institute,
+                                                                                                  phoneNumber: user.phoneNumber,
+                                                                                                  interests: user.interests,
+                                                                                                  profilePicture: user.profilePicture,
+                                                                                                  bio: user.bio,
+                                                                                                  gender: user.gender,
+                                                                                                  dateOfBirth: user.dateOfBirth,
+                                                                                                  socialLinks: user.socialLinks,
+                                                                                                  notificationPreferences: user.notificationPreferences,
+                                                                                                  privacySettings: user.privacySettings,
+                                                                                                  role: user.role,
+                                                                                                  isEmailVerified: user.isEmailVerified,
+                                                                                                  isFaceVerified: user.isFaceVerified
+                                                                                                }
+                                                                                              });
+
+                                                                                              } catch (error) {
+                                                                                                console.error('Profile update error:', error);
+                                                                                                res.status(500).json({ message: 'Profile update failed', error: error.message });
+                                                                                                }
+                                                                                              });
+
+                                                                                              // Change password
+                                                                                              router.put('/change-password', auth, async (req, res) => {
+                                                                                                try {
+                                                                                                  const { currentPassword, newPassword } = req.body;
+                                                                                                    const user = await User.findById(req.user.userId).select('+password');
+
+                                                                                                    if (!user) {
+                                                                                                      return res.status(404).json({ message: 'User not found' });
+                                                                                                      }
+
+                                                                                                      // Verify current password
+                                                                                                      const isCurrentPasswordValid = await user.comparePassword(currentPassword);
+                                                                                                      if (!isCurrentPasswordValid) {
+                                                                                                        return res.status(400).json({ message: 'Current password is incorrect' });
+                                                                                                        }
+
+                                                                                                        // Update password
+                                                                                                        user.password = newPassword;
+                                                                                                        await user.save();
+
+                                                                                                        res.json({ message: 'Password changed successfully' });
+
+                                                                                                          } catch (error) {
+                                                                                                            console.error('Password change error:', error);
+                                                                                                            res.status(500).json({ message: 'Password change failed', error: error.message });
+                                                                                                            }
+                                                                                                          });
+
+                                                                                                          // Update face data
+                                                                                                          router.post('/update-face-data', auth, async (req, res) => {
+                                                                                                            try {
+                                                                                                              const { faceData, quality } = req.body;
+
+                                                                                                                if (!faceData) {
+                                                                                                                  return res.status(400).json({ message: 'Face data is required' });
+                                                                                                                  }
+
+                                                                                                                  // Update user with face data
+                                                                                                                  const user = await User.findByIdAndUpdate(
+                                                                                                                  req.user.userId,
+                                                                                                                  {
+                                                                                                                    faceData: faceData,
+                                                                                                                    faceDataCollected: true,
+                                                                                                                    faceDataQuality: quality || 'medium',
+                                                                                                                    isFaceVerified: true
+                                                                                                                  },
+                                                                                                                  { new: true }
+                                                                                                                    );
+
+                                                                                                                    if (!user) {
+                                                                                                                      return res.status(404).json({ message: 'User not found' });
+                                                                                                                      }
+
+                                                                                                                      res.json({
+                                                                                                                        message: 'Face data updated successfully',
+                                                                                                                        user: {,
+                                                                                                                          id: user._id,
+                                                                                                                          faceDataCollected: user.faceDataCollected,
+                                                                                                                          faceDataQuality: user.faceDataQuality,
+                                                                                                                          isFaceVerified: user.isFaceVerified
+                                                                                                                        }
+                                                                                                                      });
+                                                                                                                      } catch (error) {
+                                                                                                                        console.error('Face data update error:', error);
+                                                                                                                        res.status(500).json({ message: 'Server error', error: error.message });
+                                                                                                                        }
+                                                                                                                      });
+
+                                                                                                                      // Train face model with multiple samples
+                                                                                                                      router.post('/train-face-model', auth, async (req, res) => {
+                                                                                                                        try {
+                                                                                                                          const { samples, userId } = req.body;
+
+                                                                                                                            if (!samples || samples.length < 50) {
+                                                                                                                              return res.status(400).json({
+                                                                                                                                message: 'At least 50 face samples are required for training'
+                                                                                                                              });
+                                                                                                                            }
+
+                                                                                                                            console.log(`Training face model for user ${userId} with ${samples.length} samples`);
+
+                                                                                                                              // Store face data in the new recognition system
+                                                                                                                              const storeResult = await storeFaceData(req.user.userId, samples);
+
+                                                                                                                              if (!storeResult.success) {
+                                                                                                                                return res.status(400).json({ message: storeResult.message });
+                                                                                                                                }
+
+                                                                                                                                // Update user record
+                                                                                                                                const user = await User.findByIdAndUpdate(
+                                                                                                                                req.user.userId,
+                                                                                                                                {
+                                                                                                                                  faceData: JSON.stringify(samples), // Store all samples as JSON
+                                                                                                                                  faceDataCollected: true,
+                                                                                                                                  faceDataQuality: 'high',
+                                                                                                                                  isFaceVerified: true,
+                                                                                                                                  faceTrainingCompleted: true,
+                                                                                                                                  faceTrainingDate: new Date(),
+                                                                                                                                  faceSampleCount: samples.length
+                                                                                                                                },
+                                                                                                                                { new: true }
+                                                                                                                                  );
+
+                                                                                                                                  if (!user) {
+                                                                                                                                    return res.status(404).json({ message: 'User not found' });
+                                                                                                                                    }
+
+                                                                                                                                    console.log(`Face model training completed for user ${user.email}`);
+
+                                                                                                                                      res.json({
+                                                                                                                                        message: 'Face model trained successfully',
+                                                                                                                                        user: {,
+                                                                                                                                          id: user._id,
+                                                                                                                                          faceDataCollected: user.faceDataCollected,
+                                                                                                                                          faceDataQuality: user.faceDataQuality,
+                                                                                                                                          isFaceVerified: user.isFaceVerified,
+                                                                                                                                          faceTrainingCompleted: user.faceTrainingCompleted,
+                                                                                                                                          faceSampleCount: user.faceSampleCount
+                                                                                                                                        }
+                                                                                                                                      });
+                                                                                                                                      } catch (error) {
+                                                                                                                                        console.error('Face model training error:', error);
+                                                                                                                                        res.status(500).json({ message: 'Server error', error: error.message });
+                                                                                                                                        }
+                                                                                                                                      });
+
+                                                                                                                                      // Logout (client-side token removal)
+                                                                                                                                      router.post('/logout', auth, (req, res) => {
+                                                                                                                                        res.json({ message: 'Logout successful' });
+                                                                                                                                        });
+
+
+                                                                                                                                        // GET /api/auth/face-status - Get user face verification status
+                                                                                                                                        router.get('/face-status', auth, async (req, res) => {
+                                                                                                                                          try {
+                                                                                                                                            const user = await User.findById(req.user.userId);
+
+                                                                                                                                            if (!user) {
+                                                                                                                                              return res.status(404).json({ message: 'User not found' });
+                                                                                                                                              }
+
+                                                                                                                                              res.json({
+                                                                                                                                                success: true,
+                                                                                                                                                user: {,
+                                                                                                                                                  id: user._id,
+                                                                                                                                                  email: user.email,
+                                                                                                                                                  name: user.name,
+                                                                                                                                                  faceDataCollected: user.faceDataCollected || false,
+                                                                                                                                                  isFaceVerified: user.isFaceVerified || false,
+                                                                                                                                                  faceSampleCount: user.faceSampleCount || 0,
+                                                                                                                                                  faceTrainingDate: user.faceTrainingDate,
+                                                                                                                                                  faceVerificationDate: user.faceVerificationDate,
+                                                                                                                                                  faceVerificationConfidence: user.faceVerificationConfidence,
+                                                                                                                                                  faceDataQuality: user.faceDataQuality
+                                                                                                                                                }
+                                                                                                                                              });
+                                                                                                                                              } catch (error) {
+                                                                                                                                                console.error('Get face status error:', error);
+                                                                                                                                                res.status(500).json({
+                                                                                                                                                  message: 'Failed to get face status',
+                                                                                                                                                  error: error.message
+                                                                                                                                                });
+                                                                                                                                              }
+                                                                                                                                            });
+                                                                                                                                            module.exports = router;

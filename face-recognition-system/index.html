@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Face Recognition System</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <h1>🎯 Advanced Face Recognition System</h1>
+            <p>Local Storage • Zero Dependencies • Maximum Performance</p>
+        </header>
+
+        <!-- Main Dashboard -->
+        <div class="dashboard">
+            <!-- Status Panel -->
+            <div class="status-panel">
+                <h2>System Status</h2>
+                <div id="status-info">
+                    <div class="status-item">
+                        <span class="label">Face Data:</span>
+                        <span id="face-data-status" class="value">Loading...</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Samples:</span>
+                        <span id="sample-count" class="value">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Trained:</span>
+                        <span id="trained-status" class="value">No</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Last Updated:</span>
+                        <span id="last-updated" class="value">Never</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-panel">
+                <button id="train-btn" class="btn btn-primary">
+                    🎯 Start Training
+                </button>
+                <button id="verify-btn" class="btn btn-success">
+                    ✅ Verify Face
+                </button>
+                <button id="clear-btn" class="btn btn-danger">
+                    🗑️ Clear Data
+                </button>
+                <button id="export-btn" class="btn btn-info">
+                    📤 Export Data
+                </button>
+                <button id="import-btn" class="btn btn-warning">
+                    📥 Import Data
+                </button>
+            </div>
+
+            <!-- Camera Preview -->
+            <div class="camera-panel">
+                <h3>Camera Preview</h3>
+                <div class="camera-container">
+                    <video id="video" autoplay muted playsinline></video>
+                    <canvas id="canvas" style="display: none;"></canvas>
+                    <div id="face-overlay" class="face-overlay"></div>
+                </div>
+                <div class="camera-controls">
+                    <button id="start-camera" class="btn btn-secondary">📷 Start Camera</button>
+                    <button id="stop-camera" class="btn btn-secondary">⏹️ Stop Camera</button>
+                </div>
+            </div>
+
+            <!-- Training Progress -->
+            <div id="training-panel" class="training-panel" style="display: none;">
+                <h3>Training Progress</h3>
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div id="progress-fill" class="progress-fill"></div>
+                    </div>
+                    <span id="progress-text">0%</span>
+                </div>
+                <div id="training-stats">
+                    <p>Collected: <span id="collected-samples">0</span> / <span id="required-samples">20</span></p>
+                    <p>Quality: <span id="quality-score">0%</span></p>
+                </div>
+                <button id="stop-training" class="btn btn-danger">Stop Training</button>
+            </div>
+
+            <!-- Verification Results -->
+            <div id="verification-panel" class="verification-panel" style="display: none;">
+                <h3>Verification Results</h3>
+                <div id="verification-results">
+                    <div class="result-item">
+                        <span class="label">Confidence:</span>
+                        <span id="confidence-score" class="value">0%</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="label">Match:</span>
+                        <span id="match-result" class="value">Unknown</span>
+                    </div>
+                </div>
+                <button id="close-verification" class="btn btn-secondary">Close</button>
+            </div>
+
+            <!-- Data Management -->
+            <div class="data-panel">
+                <h3>Data Management</h3>
+                <div class="data-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Storage Used:</span>
+                        <span id="storage-used">0 KB</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Samples:</span>
+                        <span id="total-samples">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Data Version:</span>
+                        <span id="data-version">1.0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hidden File Input -->
+        <input type="file" id="import-file" accept=".json" style="display: none;">
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/face-detection.js"></script>
+    <script src="js/local-storage.js"></script>
+    <script src="js/face-training.js"></script>
+    <script src="js/face-verification.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
