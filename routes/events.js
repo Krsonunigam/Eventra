@@ -6,12 +6,17 @@ const { auth } = require('../middleware/auth');
 const router = express.Router();
 
 // Get all published events
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
     const { category, search, date, page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
 
-    let query = { status: 'published', isActive: true, 'dateTime.end': { $gte: new Date() } };
+    let query = { status: 'published', isActive: true };
+    
+    // Non-admins should only see upcoming events
+    if (req.user.role !== 'admin' && req.user.role !== 'premium_admin') {
+      query['dateTime.start'] = { $gte: new Date() };
+    }
     
     if (category) {
       query.category = category;
@@ -160,27 +165,30 @@ router.get('/current', auth, async (req, res) => {
 });
 
 // Get events by category
-router.get('/category/:category', async (req, res) => {
+router.get('/category/:category', auth, async (req, res) => {
   try {
     const { category } = req.params;
     const { page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
 
-    const events = await Event.find({
+    let query = {
       category,
       status: 'published',
       isActive: true
-    })
+    };
+
+    // Non-admins should only see upcoming events
+    if (req.user.role !== 'admin' && req.user.role !== 'premium_admin') {
+      query['dateTime.start'] = { $gte: new Date() };
+    }
+
+    const events = await Event.find(query)
     .populate('organizer', 'name email')
     .sort({ 'dateTime.start': 1 })
     .skip(skip)
     .limit(parseInt(limit));
 
-    const total = await Event.countDocuments({
-      category,
-      status: 'published',
-      isActive: true
-    });
+    const total = await Event.countDocuments(query);
 
     res.json({
       events,
@@ -291,13 +299,18 @@ router.get('/:id/stats', auth, async (req, res) => {
 });
 
 // Search events
-router.get('/search/query', async (req, res) => {
+router.get('/search/query', auth, async (req, res) => {
   try {
     const { q, category, dateFrom, dateTo, priceMin, priceMax } = req.query;
     const { page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
 
     let query = { status: 'published', isActive: true };
+
+    // Non-admins should only see upcoming events
+    if (req.user.role !== 'admin' && req.user.role !== 'premium_admin') {
+      query['dateTime.start'] = { $gte: new Date() };
+    }
 
     if (q) {
       // Search only in event titles for better indexing
