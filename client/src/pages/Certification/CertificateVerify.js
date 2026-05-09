@@ -12,7 +12,8 @@ import {
   CheckCircle2,
   XCircle,
   Building2,
-  Clock
+  Clock,
+  Mail
 } from 'lucide-react';
 import api from '../../utils/axiosConfig';
 import { formatDateIST } from '../../utils/timezoneUtils';
