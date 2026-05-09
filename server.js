@@ -89,8 +89,12 @@ mongoose.connect(process.env.MONGODB_URI, {
   useUnifiedTopology: true,
   autoIndex: false
 })
-.then(() => {})
-.catch(err => {});
+.then(() => {
+  console.log('✅ Connected to MongoDB');
+})
+.catch(err => {
+  console.error('❌ MongoDB Connection Error:', err.message);
+});
 
 // Handle preflight requests
 app.options('*', (req, res) => {
@@ -144,20 +148,37 @@ app.use('/api/upload', require('./routes/upload'));
 app.use('/api/certificates', require('./routes/certificates'));
 
 
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static('client/build'));
-  
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+// Health check route for production monitoring
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'online', 
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV,
+    db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
+});
+
+// Root route - Welcome message
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Eventra API is running', 
+    version: '1.0.0',
+    documentation: '/api/health'
+  });
+});
+
+if (process.env.NODE_ENV === 'production') {
+  // Only serve static files if the build folder exists
+  const buildPath = path.join(__dirname, 'client/build');
+  app.use(express.static(buildPath));
 }
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  
+  console.error('🔴 Server Error:', err);
   res.status(500).json({ 
     message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'production' ? {} : err.stack
+    error: process.env.NODE_ENV === 'production' ? err.message : err.stack
   });
 });
 
