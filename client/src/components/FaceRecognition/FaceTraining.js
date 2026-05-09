@@ -92,7 +92,7 @@ const FaceTraining = ({ isOpen, onComplete, onClose }) => {
         formData.append('faces', img);
       });
 
-      const res = await fetch('/api/face/collect', {
+      const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/face/collect`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`

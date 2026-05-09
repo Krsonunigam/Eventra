@@ -23,7 +23,7 @@ const ProfileEdit = () => {
         const imageFormData = new FormData();
         imageFormData.append('profilePicture', formData.profileImage);
 
-        const uploadResponse = await fetch('/api/upload/profile', {
+        const uploadResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/upload/profile`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,

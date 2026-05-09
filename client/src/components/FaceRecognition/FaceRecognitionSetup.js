@@ -75,7 +75,7 @@ const FaceRecognitionSetup = ({ onClose, onSuccess, user }) => {
 
     try {
       // Send face data for processing
-      const response = await fetch('/api/face/collect', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/face/collect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
