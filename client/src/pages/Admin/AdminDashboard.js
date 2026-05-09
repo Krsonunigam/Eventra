@@ -22,7 +22,8 @@ import {
   CheckCircle,
   Scan,
   RefreshCw,
-  Award
+  Award,
+  MessageSquare
 } from 'lucide-react';
 import api from '../../utils/axiosConfig';
 import useCustomToast from '../../utils/customToast';
@@ -44,6 +45,8 @@ const AdminDashboard = () => {
   const [recentUsers, setRecentUsers] = useState([]);
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [recentBookings, setRecentBookings] = useState([]);
+  const [recentMessages, setRecentMessages] = useState([]);
+  const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const [faceScannerOpen, setFaceScannerOpen] = useState(false);
@@ -84,6 +87,8 @@ const AdminDashboard = () => {
       setRecentUsers(data.recent.users || []);
       setUpcomingEvents(data.recent.events || []);
       setRecentBookings(data.recent.bookings || []);
+      setRecentMessages(data.recent.messages || []);
+      setPendingCount(data.recent.pendingMessagesCount || 0);
     } catch (error) {
       toast.fetchError('Failed to fetch dashboard data');
     } finally {
@@ -237,18 +242,23 @@ const AdminDashboard = () => {
               <span className="text-white">Analytics</span>
             </Link>
             <Link
-              to="/admin/reports"
-              className="flex items-center space-x-3 p-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-            >
-              <Download className="h-5 w-5 text-green-400" />
-              <span className="text-white">Export Reports</span>
-            </Link>
-            <Link
               to="/admin/certificates"
               className="flex items-center space-x-3 p-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
             >
               <Award className="h-5 w-5 text-yellow-400" />
               <span className="text-white">Certificates</span>
+            </Link>
+            <Link
+              to="/admin/messages"
+              className="relative flex items-center space-x-3 p-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+            >
+              <MessageSquare className="h-5 w-5 text-indigo-400" />
+              <span className="text-white">Messages</span>
+              {pendingCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse shadow-lg">
+                  {pendingCount}
+                </span>
+              )}
             </Link>
             <button
               onClick={() => {
@@ -303,7 +313,7 @@ const AdminDashboard = () => {
         </motion.div>
 
         {/* Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Recent Users */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -432,6 +442,44 @@ const AdminDashboard = () => {
                   <TrendingUp className="h-12 w-12 text-gray-500 mx-auto mb-3" />
                   <p className="text-gray-400 text-sm">No recent bookings</p>
                   <p className="text-gray-500 text-xs mt-1">Bookings will appear here once users start booking events</p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+
+          {/* Recent Inquiries */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.9 }}
+            className="bg-gray-800 p-6 rounded-xl border border-gray-700"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Recent Inquiries</h3>
+              <Link to="/admin/messages" className="text-cyan-400 hover:text-cyan-300 text-sm">View All</Link>
+            </div>
+            <div className="space-y-3">
+              {recentMessages.length > 0 ? (
+                recentMessages.map((msg, index) => (
+                  <div key={msg._id} className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-white text-xs font-bold truncate">{msg.name}</p>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                        msg.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                        msg.status === 'ongoing' ? 'bg-blue-500/20 text-blue-400' :
+                        'bg-green-500/20 text-green-400'
+                      }`}>
+                        {msg.status}
+                      </span>
+                    </div>
+                    <p className="text-gray-300 text-[11px] line-clamp-1">{msg.subject}</p>
+                    <p className="text-gray-500 text-[10px] mt-1">{formatDate(msg.createdAt)}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <Activity className="h-12 w-12 text-gray-500 mx-auto mb-3" />
+                  <p className="text-gray-400 text-sm">No recent inquiries</p>
                 </div>
               )}
             </div>

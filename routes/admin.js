@@ -23,7 +23,9 @@ router.get('/dashboard', async (req, res) => {
       totalRevenue,
       recentUsers,
       upcomingEvents,
-      recentBookings
+      recentBookings,
+      recentMessages,
+      pendingMessagesCount
     ] = await Promise.all([
       User.countDocuments({ role: 'user' }).catch(() => 0),
       Event.countDocuments().catch(() => 0),
@@ -38,7 +40,9 @@ router.get('/dashboard', async (req, res) => {
       Booking.find({ status: { $in: ['confirmed'] } })
         .populate('user', 'name email')
         .populate('event', 'title')
-        .sort({ createdAt: -1 }).limit(10).catch(() => [])
+        .sort({ createdAt: -1 }).limit(10).catch(() => []),
+      Contact.find().sort({ createdAt: -1 }).limit(5).catch(() => []),
+      Contact.countDocuments({ status: 'pending' }).catch(() => 0)
     ]);
 
     const revenue = totalRevenue.length > 0 ? totalRevenue[0].total : 0;
@@ -75,7 +79,8 @@ router.get('/dashboard', async (req, res) => {
         totalUsers,
         totalEvents,
         totalBookings,
-        totalRevenue: revenue
+        totalRevenue: revenue,
+        pendingMessages: pendingMessagesCount
       },
       monthly: {
         newUsers: monthlyStats[0],
@@ -85,7 +90,9 @@ router.get('/dashboard', async (req, res) => {
       recent: {
         users: recentUsers,
         events: upcomingEvents,
-        bookings: recentBookings
+        bookings: recentBookings,
+        messages: recentMessages,
+        pendingMessagesCount
       }
     });
 
