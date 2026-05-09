@@ -39,8 +39,8 @@ export const ThemeProvider = ({ children }) => {
     });
     
     // Debug logging
-    // console.log('Theme changed to:', theme);
-    // console.log('CSS Variables applied:', cssVars);
+    // 
+    // 
   }, [theme]);
 
   const toggleTheme = () => {

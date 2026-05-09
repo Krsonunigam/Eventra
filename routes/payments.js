@@ -30,7 +30,7 @@ router.post('/create-order', auth, async (req, res) => {
     // Check seat availability
     const bookedSeats = await Booking.countDocuments({
       event: eventId,
-      status: { $in: ['active', 'completed'] }
+      status: { $in: ['confirmed', 'pending'] }
     });
 
     if (bookedSeats + quantity > event.capacity) {
@@ -41,7 +41,7 @@ router.post('/create-order', auth, async (req, res) => {
     const existingBooking = await Booking.findOne({
       user: req.user.userId,
       event: eventId,
-      status: { $in: ['active', 'completed'] }
+      status: { $in: ['confirmed', 'pending'] }
     });
 
     if (existingBooking) {
@@ -76,7 +76,7 @@ router.post('/create-order', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Create order error:', error);
+    
     res.status(500).json({ message: 'Failed to create payment order', error: error.message });
   }
 });
@@ -104,7 +104,7 @@ router.post('/verify', auth, async (req, res) => {
     }
 
     booking.paymentStatus = 'completed';
-    booking.status = 'active';
+    booking.status = 'confirmed';
     booking.razorpayPaymentId = razorpay_payment_id;
     booking.razorpaySignature = razorpay_signature;
     booking.paymentId = razorpay_payment_id;
@@ -139,7 +139,7 @@ router.post('/verify', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Payment verification error:', error);
+    
     res.status(500).json({ message: 'Payment verification failed', error: error.message });
   }
 });
@@ -160,7 +160,7 @@ router.post('/cancel-booking', auth, async (req, res) => {
       return res.status(403).json({ message: 'Unauthorized access' });
     }
 
-    if (booking.status !== 'active') {
+    if (booking.status !== 'confirmed') {
       return res.status(400).json({ message: 'Booking cannot be cancelled' });
     }
 
@@ -184,7 +184,7 @@ router.post('/cancel-booking', auth, async (req, res) => {
           `Booking cancellation - ${reason}`
         );
       } catch (refundError) {
-        console.error('Refund processing error:', refundError);
+        
         // Continue with cancellation even if refund fails
       }
     }
@@ -213,7 +213,7 @@ router.post('/cancel-booking', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Cancel booking error:', error);
+    
     res.status(500).json({ message: 'Failed to cancel booking', error: error.message });
   }
 });
@@ -242,7 +242,7 @@ router.get('/history', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get payment history error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch payment history', error: error.message });
   }
 });
@@ -265,7 +265,7 @@ router.get('/booking/:id', auth, async (req, res) => {
     res.json({ booking });
 
   } catch (error) {
-    console.error('Get booking details error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch booking details', error: error.message });
   }
 });
@@ -292,25 +292,25 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     // Handle different webhook events
     switch (event.event) {
       case 'payment.captured':
-        console.log('Payment captured:', event.payload.payment.entity.id);
+        
         break;
       
       case 'payment.failed':
-        console.log('Payment failed:', event.payload.payment.entity.id);
+        
         break;
       
       case 'refund.created':
-        console.log('Refund created:', event.payload.refund.entity.id);
+        
         break;
       
       default:
-        console.log('Unhandled webhook event:', event.event);
+        
     }
 
     res.json({ message: 'Webhook processed successfully' });
 
   } catch (error) {
-    console.error('Webhook processing error:', error);
+    
     res.status(500).json({ message: 'Webhook processing failed', error: error.message });
   }
 });

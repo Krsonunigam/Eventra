@@ -39,12 +39,7 @@ const AdminReports = () => {
   const fetchReportsData = async () => {
     try {
       setLoading(true);
-      console.log('Fetching reports data with params:', {
-        startDate: dateRange.start,
-        endDate: dateRange.end,
-        status: statusFilter,
-        search: searchTerm
-      });
+      
 
       const [bookingsResponse, statsResponse] = await Promise.all([
         api.get('/api/admin/reports/bookings', {
@@ -63,14 +58,14 @@ const AdminReports = () => {
         })
       ]);
 
-      console.log('Bookings response:', bookingsResponse.data);
-      console.log('Stats response:', statsResponse.data);
+      
+      
 
       setRecentBookings(bookingsResponse.data.bookings);
       setBookingStats(statsResponse.data);
     } catch (error) {
-      console.error('Error fetching reports data:', error);
-      console.error('Error details:', error.response?.data);
+      
+      
       toast.error('Failed to fetch reports data');
     } finally {
       setLoading(false);
@@ -100,7 +95,7 @@ const AdminReports = () => {
 
       toast.success(`Report exported as ${format.toUpperCase()}`);
     } catch (error) {
-      console.error('Export error:', error);
+      
       toast.error('Failed to export report');
     }
   };
@@ -282,10 +277,10 @@ const AdminReports = () => {
             onClick={async () => {
               try {
                 const response = await api.get('/api/admin/reports/test');
-                console.log('Test endpoint response:', response.data);
+                
                 toast.success(`Found ${response.data.totalBookings} total bookings`);
               } catch (error) {
-                console.error('Test endpoint error:', error);
+                
                 toast.error('Test failed');
               }
             }}

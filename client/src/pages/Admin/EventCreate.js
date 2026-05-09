@@ -4,8 +4,10 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Plus } from 'lucide-react';
 import api from '../../utils/axiosConfig';
 import EventForm from '../../components/Forms/EventForm';
+import useCustomToast from '../../utils/customToast';
 
 const EventCreate = () => {
+  const toast = useCustomToast();
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -58,27 +60,24 @@ const EventCreate = () => {
         detailedSchedule: formData.detailedSchedule || [],
         sponsors: formData.sponsors || [],
         organizerContact: formData.organizerContact || {},
+        organizer: formData.organizer || '',
         status: 'draft',
         isActive: true,
         image: imageUrl
       };
 
-      console.log('Creating event with data:', JSON.stringify(eventData, null, 2));
-      console.log('Date types:', {
-        start: typeof eventData.dateTime.start,
-        end: typeof eventData.dateTime.end,
-        registrationDeadline: typeof eventData.registrationDeadline
-      });
+      
+      
 
       const response = await api.post('/api/admin/events', eventData);
 
-      console.log('Event created successfully:', response.data);
+      
       navigate('/admin/events', { 
         state: { message: 'Event created successfully!' }
       });
     } catch (error) {
-      console.error('Error creating event:', error);
-      alert(`Error creating event: ${error.message}`);
+      
+      toast.error(error.response?.data?.message || `Error creating event: ${error.message}`);
     } finally {
       setLoading(false);
     }

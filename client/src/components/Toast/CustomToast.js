@@ -1,5 +1,5 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { X, CheckCircle, AlertCircle, AlertTriangle, Info, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 
@@ -16,13 +16,14 @@ const CustomToast = ({ t, message, type, title, style }) => {
   };
 
   const getIcon = () => {
+    const iconClass = "h-6 w-6 text-white";
     switch (type) {
-      case 'success': return '✅';
-      case 'error': return '❌';
-      case 'warning': return '⚠️';
-      case 'info': return 'ℹ️';
-      case 'loading': return '⏳';
-      default: return '💬';
+      case 'success': return <CheckCircle className={iconClass} />;
+      case 'error': return <AlertCircle className={iconClass} />;
+      case 'warning': return <AlertTriangle className={iconClass} />;
+      case 'info': return <Info className={iconClass} />;
+      case 'loading': return <Loader2 className={`${iconClass} animate-spin`} />;
+      default: return <Info className={iconClass} />;
     }
   };
 
@@ -41,7 +42,7 @@ const CustomToast = ({ t, message, type, title, style }) => {
           <div className="flex-1 w-0 p-4">
             <div className="flex items-start">
               <div className="flex-shrink-0 pt-0.5">
-                <span className="text-2xl">{getIcon()}</span>
+                {getIcon()}
               </div>
               <div className="ml-3 flex-1">
                 {title && <p className="text-sm font-medium text-white">{title}</p>}

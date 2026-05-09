@@ -124,7 +124,7 @@ const EventForm = ({ initialData = null, onSubmit, loading = false }) => {
       bannerImage: bannerImage,
       price: Math.round(parseFloat(data.price) * 100) / 100 || 0
     };
-    console.log('Form data being submitted:', formData);
+    
     onSubmit(formData);
   };
 

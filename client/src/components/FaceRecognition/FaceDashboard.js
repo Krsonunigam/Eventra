@@ -15,13 +15,13 @@ const FaceDashboard = () => {
   };
 
   const handleTrainingComplete = (result) => {
-    console.log('Training completed:', result);
+    
     setShowTraining(false);
     handleRefresh();
   };
 
   const handleVerificationSuccess = (result) => {
-    console.log('Verification successful:', result);
+    
     setShowVerification(false);
   };
 

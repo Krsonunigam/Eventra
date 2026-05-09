@@ -10,14 +10,14 @@ const publishAllDraftEvents = async () => {
       useUnifiedTopology: true,
     });
 
-    console.log('Connected to MongoDB');
+    
 
     // Find all draft events
     const draftEvents = await Event.find({ status: 'draft' });
-    console.log(`Found ${draftEvents.length} draft events`);
+    
 
     if (draftEvents.length === 0) {
-      console.log('✅ No draft events found');
+      
       return;
     }
 
@@ -27,20 +27,20 @@ const publishAllDraftEvents = async () => {
       { status: 'published' }
     );
 
-    console.log(`✅ Updated ${result.modifiedCount} events from draft to published`);
+    
 
     // Show the updated events
     const updatedEvents = await Event.find({ status: 'published' });
-    console.log('\n📋 All published events:');
+    
     updatedEvents.forEach(event => {
-      console.log(`- ${event.title} (ID: ${event._id})`);
+      
     });
 
   } catch (error) {
-    console.error('❌ Error updating events:', error);
+    
   } finally {
     await mongoose.disconnect();
-    console.log('Disconnected from MongoDB');
+    
   }
 };
 

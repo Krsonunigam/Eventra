@@ -147,7 +147,7 @@ router.post('/generate', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Certificate generation error:', error);
+    
     res.status(500).json({
       message: 'Certificate generation failed',
       error: error.message,
@@ -217,7 +217,7 @@ router.get('/:id/download', auth, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Certificate download error:', error);
+    
     res.status(500).json({
       message: 'Certificate download failed',
       error: error.message,
@@ -259,7 +259,7 @@ router.get('/my-certificates', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get certificates error:', error);
+    
     res.status(500).json({
       message: 'Failed to fetch certificates',
       error: error.message,
@@ -318,7 +318,7 @@ router.get('/verify/:verificationCode', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Certificate verification error:', error);
+    
     res.status(500).json({
       message: 'Certificate verification failed',
       error: error.message,
@@ -376,7 +376,7 @@ router.get('/:id', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get certificate error:', error);
+    
     res.status(500).json({
       message: 'Failed to fetch certificate',
       error: error.message,

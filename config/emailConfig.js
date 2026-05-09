@@ -23,16 +23,16 @@ if (hasGmailConfig) {
   // Verify connection for Gmail
   transporter.verify((error, success) => {
     if (error) {
-      console.log('❌ Gmail SMTP error:', error.message);
-      console.log('📧 Email service: Using development mode (emails logged to console)');
+      // 
+      // 
     } else {
-      console.log('✅ Gmail SMTP connected successfully');
-      console.log('📧 Email service: Real emails will be sent');
+      // 
+      // 
     }
   });
 } else {
-  console.log('📧 Email service: Development mode - emails will be logged to console');
-  console.log('💡 To enable real emails, set EMAIL_USER and EMAIL_PASS in your environment');
+  
+  
 }
 
 module.exports = transporter;

@@ -21,7 +21,7 @@ class FaceTraining {
 
     async startTraining() {
         if (this.isTraining) {
-            console.warn('Training already in progress');
+            
             return false;
         }
 
@@ -32,7 +32,7 @@ class FaceTraining {
             this.trainingProgress = 0;
             this.trainingStartTime = Date.now();
 
-            console.log('Starting face training...');
+            
             this.updateProgress(0, 'Initializing training...');
 
             // Load existing samples
@@ -51,7 +51,7 @@ class FaceTraining {
 
             return true;
         } catch (error) {
-            console.error('Failed to start training:', error);
+            
             this.handleError(error);
             return false;
         }
@@ -63,7 +63,7 @@ class FaceTraining {
         this.isTraining = false;
         this.clearCaptureInterval();
         
-        console.log('Training stopped');
+        
         this.updateProgress(0, 'Training stopped');
     }
 
@@ -90,14 +90,14 @@ class FaceTraining {
         try {
             const video = document.getElementById('video');
             if (!video || !video.videoWidth) {
-                console.warn('Video not ready for capture');
+                
                 return;
             }
 
             // Get current detection results
             const detectionResults = window.faceDetection.getDetectionResults();
             if (!detectionResults || !detectionResults.detections || detectionResults.detections.length === 0) {
-                console.warn('No face detected for capture');
+                
                 return;
             }
 
@@ -148,11 +148,11 @@ class FaceTraining {
                     );
                 }
             } else {
-                console.log(`Sample quality too low: ${Math.round(quality.score * 100)}% (required: ${Math.round(this.qualityThreshold * 100)}%)`);
+                
             }
 
         } catch (error) {
-            console.error('Error capturing sample:', error);
+            
             this.handleError(error);
         }
     }
@@ -281,7 +281,7 @@ class FaceTraining {
             
             if (success) {
                 const trainingTime = Date.now() - this.trainingStartTime;
-                console.log(`Training completed in ${Math.round(trainingTime / 1000)}s`);
+                
                 
                 this.updateProgress(100, 'Training completed successfully!');
                 
@@ -297,7 +297,7 @@ class FaceTraining {
                 throw new Error('Failed to mark training as complete');
             }
         } catch (error) {
-            console.error('Error completing training:', error);
+            
             this.handleError(error);
         }
     }
@@ -323,7 +323,7 @@ class FaceTraining {
     }
 
     handleError(error) {
-        console.error('Training error:', error);
+        
         
         if (this.onErrorCallback) {
             this.onErrorCallback(error);
@@ -333,12 +333,12 @@ class FaceTraining {
     // Manual sample capture
     async captureManualSample() {
         if (!this.isTraining) {
-            console.warn('Training not active');
+            
             return false;
         }
 
         if (this.currentSample >= this.requiredSamples) {
-            console.warn('Already have enough samples');
+            
             return false;
         }
 
@@ -369,7 +369,7 @@ class FaceTraining {
         // Clear storage
         window.faceStorage.clearData();
         
-        console.log('Training reset');
+        
         this.updateProgress(0, 'Training reset');
     }
 }

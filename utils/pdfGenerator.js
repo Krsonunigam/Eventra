@@ -31,21 +31,17 @@ class PDFGenerator {
           resolve(pdfData);
         });
 
-        // Generate QR Code with all details needed by admin scanner
+        // Generate expanded QR Code for comprehensive verification
         const qrData = {
           bookingId: booking._id,
+          userId: booking.user?._id || booking.user,
           eventId: event._id,
-          userId: user._id,
-          eventTitle: event.title,
-          attendeeName: user.name,
-          attendeeEmail: user.email,
-          eventDate: event.dateTime.start,
-          venue: event.venue?.name,
-          verificationCode: booking.verificationCode
+          verificationCode: booking.verificationCode,
+          timestamp: new Date().toISOString()
         };
 
         const qrCodeDataURL = await QRCode.toDataURL(JSON.stringify(qrData), {
-          width: 60,
+          width: 80, // Slightly larger for better readability of more data
           margin: 1,
           color: {
             dark: '#000000',
@@ -53,8 +49,8 @@ class PDFGenerator {
           }
         });
 
-        // Draw logo watermark background
-        this.drawLogoWatermark();
+        // Draw logo and student name watermark background
+        this.drawLogoWatermark(user.name);
 
         // Draw clean airplane-style ticket
         this.drawCleanAirplaneTicket(event, user, booking, qrCodeDataURL);
@@ -67,7 +63,7 @@ class PDFGenerator {
     });
   }
 
-  drawLogoWatermark() {
+  drawLogoWatermark(studentName = 'EVENTRA') {
     try {
       // Try to load the logo file
       const logoPath = path.join(__dirname, '..', 'logo.png');
@@ -90,7 +86,7 @@ class PDFGenerator {
               });
             } catch (logoError) {
               // If logo fails, use text fallback
-              this.drawTextWatermark(x, y);
+              this.drawTextWatermark(x, y, studentName);
             }
           }
         }
@@ -98,15 +94,15 @@ class PDFGenerator {
         this.doc.restore();
       } else {
         // Fallback to text watermark if logo not found
-        this.drawTextWatermark();
+        this.drawTextWatermark(0, 0, studentName);
       }
     } catch (error) {
-      console.log('Logo watermark error, using text fallback');
-      this.drawTextWatermark();
+      
+      this.drawTextWatermark(0, 0, studentName);
     }
   }
 
-  drawTextWatermark(x = 0, y = 0) {
+  drawTextWatermark(x = 0, y = 0, text = 'EVENTRA') {
     this.doc.save();
     this.doc.opacity(0.05);
     this.doc.fillColor('#CCCCCC');
@@ -114,7 +110,7 @@ class PDFGenerator {
     // Create diagonal watermark pattern
     for (let wx = -100; wx < 700; wx += 120) {
       for (let wy = -50; wy < 250; wy += 80) {
-        this.doc.text('EVENTRA', wx, wy, {
+        this.doc.text(text.toUpperCase(), wx, wy, {
           fontSize: 20,
           angle: -45,
           align: 'center'
@@ -128,175 +124,196 @@ class PDFGenerator {
   drawCleanAirplaneTicket(event, user, booking, qrCodeDataURL) {
     const pageWidth = 612;
     const pageHeight = 200;
+    const margin = 10;
     
-    // Clean white background
-    this.doc.rect(0, 0, pageWidth, pageHeight).fill('#FFFFFF');
+    // Background - Off-white for premium feel
+    this.doc.rect(0, 0, pageWidth, pageHeight).fill('#F9FAFB');
 
-    // Subtle border
-    this.doc.rect(8, 8, pageWidth - 16, pageHeight - 16)
-           .stroke('#E5E5E5')
-           .lineWidth(1);
+    // Main Card Container with rounded corners
+    this.doc.roundedRect(margin, margin, pageWidth - margin * 2, pageHeight - margin * 2, 8)
+           .fill('#FFFFFF');
+    
+    // Subtle shadow-like border
+    this.doc.roundedRect(margin, margin, pageWidth - margin * 2, pageHeight - margin * 2, 8)
+           .lineWidth(0.5)
+           .stroke('#E5E7EB');
 
-    // Main ticket section (left 65%)
-    const mainSectionWidth = pageWidth * 0.65;
+    // Accent Header Bar
+    this.doc.roundedRect(margin, margin, pageWidth - margin * 2, 40, 8)
+           .fill('#1E1B4B'); // Deep indigo
+
+    // Main ticket section (left 70%)
+    const mainSectionWidth = pageWidth * 0.70;
     this.drawMainSection(event, user, booking, qrCodeDataURL, mainSectionWidth, pageHeight);
 
-    // Clean separator line
-    this.drawCleanSeparator(mainSectionWidth, 15, mainSectionWidth, pageHeight - 15);
-
-    // Stub section (right 35%)
+    // Stub section (right 30%)
     const stubSectionStart = mainSectionWidth;
     const stubSectionWidth = pageWidth - stubSectionStart;
+    
+    // Perforated edge effect
+    this.drawPerforation(mainSectionWidth, margin, pageHeight - margin);
+    
     this.drawStubSection(event, booking, stubSectionStart, stubSectionWidth, pageHeight);
   }
 
   drawMainSection(event, user, booking, qrCodeDataURL, sectionWidth, pageHeight) {
-    const margin = 20;
-    let currentY = 25;
+    const margin = 25;
+    let currentY = 22;
 
-    // Clean header with proper alignment
-    this.doc.fillColor('#1E3A8A') // Professional blue
-           .fontSize(18)
+    // Logo / Brand on header
+    this.doc.fillColor('#FFFFFF')
+           .fontSize(16)
            .font('Helvetica-Bold')
            .text('EVENTRA', margin, currentY);
 
-    this.doc.fillColor('#6B7280') // Gray subtitle
-           .fontSize(10)
-           .font('Helvetica')
-           .text('EVENT PASS', margin + 80, currentY + 3);
-
-    currentY += 30;
-
-    // Event details with clean alignment
-    this.drawEventDetails(event, margin, currentY);
-    currentY += 80;
-
-    // Passenger details with clean alignment
-    this.drawPassengerDetails(user, margin, currentY);
-    currentY += 40;
-
-    // Seat and gate info
-    this.drawSeatInfo(margin, currentY);
-
-    // QR Code positioned cleanly
-    const qrX = sectionWidth - 75;
-    const qrY = 25;
-    this.doc.image(qrCodeDataURL, qrX, qrY, { width: 60, height: 60 });
-
-    // Confirmation code below QR
-    this.doc.fillColor('#000000')
+    this.doc.fillColor('#A5B4FC') // Light indigo
            .fontSize(8)
-           .font('Helvetica-Bold')
-           .text('CONFIRMATION', qrX - 5, qrY + 65);
+           .font('Helvetica')
+           .text('OFFICIAL EVENT PASS', margin + 85, currentY + 6);
 
+    currentY = 65;
+
+    // Event Title (Large and Bold)
+    this.doc.fillColor('#111827')
+           .fontSize(14)
+           .font('Helvetica-Bold')
+           .text(event.title?.toUpperCase() || 'EVENT NAME', margin, currentY, { width: sectionWidth - 100 });
+
+    currentY += 25;
+
+    // Grid Layout for details
+    const col1 = margin;
+    const col2 = margin + 140;
+
+    // Row 1: Date & Time
+    this.drawLabelValue(col1, currentY, 'DATE', this.formatDate(event.dateTime?.start));
+    this.drawLabelValue(col2, currentY, 'TIME', this.formatTime(event.dateTime?.start));
+
+    currentY += 35;
+
+    // Row 2: Venue
+    this.drawLabelValue(col1, currentY, 'VENUE', event.venue?.name || 'ONLINE EVENT');
+    
+    // Seat info on same row
+    const seat = this.generateRandomSeat();
+    this.drawLabelValue(col2, currentY, 'SEAT / GATE', `${seat}  •  GATE 1`);
+
+    currentY += 35;
+
+    // Row 3: USER
+    this.drawLabelValue(col1, currentY, 'USER', user.name || 'GUEST');
     this.doc.fillColor('#6B7280')
            .fontSize(7)
-           .font('Helvetica')
-           .text(booking.verificationCode || 'ABC123', qrX - 2, qrY + 75);
+           .text(user.email || '', col1, currentY + 18);
 
-    // Price in bottom right
-    const priceY = pageHeight - 25;
-    this.doc.fillColor('#1E3A8A')
-           .fontSize(12)
+    // QR Code Section (Right side of main section)
+    const qrX = sectionWidth - 85;
+    const qrY = 60;
+    
+    // QR Code Frame
+    this.doc.roundedRect(qrX - 5, qrY - 5, 70, 70, 4)
+           .fill('#F3F4F6');
+    
+    this.doc.image(qrCodeDataURL, qrX, qrY, { width: 60, height: 60 });
+
+    this.doc.fillColor('#9CA3AF')
+           .fontSize(6)
+           .font('Helvetica')
+           .text('SCAN FOR ENTRY', qrX, qrY + 68, { width: 60, align: 'center' });
+    
+    // Price Tag
+    this.doc.fillColor('#1E1B4B')
+           .fontSize(14)
            .font('Helvetica-Bold')
-           .text(`₹${event.price || '300'}`, qrX, priceY);
+           .text(`₹${event.price || '0'}`, sectionWidth - 85, pageHeight - 35, { width: 70, align: 'right' });
   }
 
-  drawEventDetails(event, startX, startY) {
-    // Event title
-    this.doc.fillColor('#000000')
-           .fontSize(12)
-           .font('Helvetica-Bold')
-           .text('EVENT', startX, startY);
-
-    this.doc.fillColor('#000000')
-           .fontSize(10)
-           .font('Helvetica')
-           .text(event.title || 'EVENT NAME', startX + 50, startY);
-
-    // Date and time with proper alignment
-    this.doc.fillColor('#000000')
-           .fontSize(10)
-           .font('Helvetica-Bold')
-           .text('DATE', startX, startY + 20);
-
-    const eventDate = this.formatDate(event.dateTime?.start);
-    this.doc.fillColor('#000000')
-           .fontSize(9)
-           .font('Helvetica')
-           .text(eventDate, startX + 50, startY + 20);
-
-    this.doc.fillColor('#000000')
-           .fontSize(10)
-           .font('Helvetica-Bold')
-           .text('TIME', startX + 150, startY + 20);
-
-    const eventTime = this.formatTime(event.dateTime?.start);
-    this.doc.fillColor('#000000')
-           .fontSize(9)
-           .font('Helvetica')
-           .text(eventTime, startX + 190, startY + 20);
-
-    // Venue
-    this.doc.fillColor('#000000')
-           .fontSize(10)
-           .font('Helvetica-Bold')
-           .text('VENUE', startX, startY + 40);
-
-    this.doc.fillColor('#000000')
-           .fontSize(9)
-           .font('Helvetica')
-           .text(event.venue?.name || 'VENUE NAME', startX + 50, startY + 40, {
-             width: 200,
-             ellipsis: true
-           });
-  }
-
-  drawPassengerDetails(user, startX, startY) {
-    this.doc.fillColor('#000000')
-           .fontSize(10)
-           .font('Helvetica-Bold')
-           .text('PASSENGER', startX, startY);
-
-    this.doc.fillColor('#000000')
-           .fontSize(10)
-           .font('Helvetica')
-           .text(user.name || 'ATTENDEE NAME', startX + 70, startY);
-
-    // Email below name
+  drawLabelValue(x, y, label, value) {
     this.doc.fillColor('#6B7280')
-           .fontSize(8)
+           .fontSize(7)
+           .font('Helvetica-Bold')
+           .text(label, x, y);
+
+    this.doc.fillColor('#1F2937')
+           .fontSize(10)
            .font('Helvetica')
-           .text(user.email || 'email@example.com', startX + 70, startY + 15);
+           .text(value, x, y + 10, { width: 130, ellipsis: true });
   }
 
-  drawSeatInfo(startX, startY) {
-    // Seat
-    this.doc.fillColor('#000000')
-           .fontSize(10)
+  drawPerforation(x, yStart, yEnd) {
+    this.doc.save();
+    this.doc.strokeColor('#E5E7EB')
+           .dash(3, { space: 4 })
+           .lineWidth(1)
+           .moveTo(x, yStart)
+           .lineTo(x, yEnd)
+           .stroke()
+           .restore();
+
+    // Circle cutouts top and bottom
+    this.doc.circle(x, yStart, 6).fill('#F9FAFB');
+    this.doc.circle(x, yEnd, 6).fill('#F9FAFB');
+  }
+
+  drawStubSection(event, booking, sectionStart, sectionWidth, pageHeight) {
+    const margin = 15;
+    let currentY = 22;
+
+    // Stub header on navy background
+    this.doc.fillColor('#FFFFFF')
+           .fontSize(11)
            .font('Helvetica-Bold')
-           .text('SEAT', startX, startY);
+           .text('RECEIPT', sectionStart + margin, currentY);
 
-    // Generate random seat like A12-F30
-    const seat = this.generateRandomSeat();
+    currentY = 65;
 
-    this.doc.fillColor('#1E3A8A')
-           .fontSize(10)
+    // Booking Details
+    this.drawLabelValue(sectionStart + margin, currentY, 'BOOKING ID', booking._id.toString().substring(0, 10).toUpperCase());
+    
+    currentY += 35;
+    
+    this.drawLabelValue(sectionStart + margin, currentY, 'VERIFICATION', booking.verificationCode || '---');
+    
+    currentY += 35;
+
+    // Status Badge
+    this.doc.fillColor('#6B7280')
+           .fontSize(7)
            .font('Helvetica-Bold')
-           .text(seat, startX + 40, startY);
-
-    // Gate
-    this.doc.fillColor('#000000')
-           .fontSize(10)
+           .text('STATUS', sectionStart + margin, currentY);
+    
+    const status = booking.status?.toUpperCase() || 'CONFIRMED';
+    const statusColor = status === 'CONFIRMED' ? '#059669' : '#DC2626';
+    
+    this.doc.fillColor(statusColor)
+           .fontSize(9)
            .font('Helvetica-Bold')
-           .text('GATE', startX + 80, startY);
+           .text(status, sectionStart + margin, currentY + 10);
 
-    this.doc.fillColor('#1E3A8A')
-           .fontSize(10)
-           .font('Helvetica-Bold')
-           .text('1', startX + 120, startY);
+    // Bottom Barcode
+    this.drawCleanBarcode(booking.verificationCode || 'EVENTRA', sectionStart + margin, pageHeight - 40, sectionWidth - 30);
+  }
 
-    // Removed class label to avoid confusion
+  drawCleanBarcode(data, x, y, width) {
+    const barHeight = 15;
+    const barWidth = 1.2;
+    const numBars = Math.floor(width / barWidth);
+    
+    this.doc.save();
+    for (let i = 0; i < numBars; i++) {
+      const barX = x + (i * barWidth);
+      // Pseudo-random barcode look
+      if ((i % 3 === 0 && i % 2 !== 0) || (i % 7 === 0)) {
+        this.doc.fillColor('#1F2937')
+               .rect(barX, y, barWidth, barHeight)
+               .fill();
+      }
+    }
+    
+    this.doc.fillColor('#9CA3AF')
+           .fontSize(6)
+           .text(new Date().toLocaleDateString('en-GB'), x, y + barHeight + 4);
+    this.doc.restore();
   }
 
   generateRandomSeat() {
@@ -304,101 +321,6 @@ class PDFGenerator {
     const row = rows[Math.floor(Math.random() * rows.length)];
     const number = Math.floor(Math.random() * 30) + 1; // 1-30
     return `${row}${number}`;
-  }
-
-  drawStubSection(event, booking, sectionStart, sectionWidth, pageHeight) {
-    const margin = 15;
-    let currentY = 25;
-
-    // Stub header
-    this.doc.fillColor('#1E3A8A')
-           .fontSize(12)
-           .font('Helvetica-Bold')
-           .text('RECEIPT', sectionStart + margin, currentY);
-
-    currentY += 25;
-
-    // Booking details with clean alignment
-    this.doc.fillColor('#000000')
-           .fontSize(9)
-           .font('Helvetica-Bold')
-           .text('BOOKING ID', sectionStart + margin, currentY);
-
-    this.doc.fillColor('#6B7280')
-           .fontSize(8)
-           .font('Helvetica')
-           .text(booking._id.toString().substring(0, 12), sectionStart + margin, currentY + 12);
-
-    currentY += 35;
-
-    // Amount
-    this.doc.fillColor('#000000')
-           .fontSize(9)
-           .font('Helvetica-Bold')
-           .text('AMOUNT', sectionStart + margin, currentY);
-
-    this.doc.fillColor('#059669')
-           .fontSize(10)
-           .font('Helvetica-Bold')
-           .text(`₹${booking.totalAmount || '300'}`, sectionStart + margin, currentY + 12);
-
-    currentY += 35;
-
-    // Status
-    this.doc.fillColor('#000000')
-           .fontSize(9)
-           .font('Helvetica-Bold')
-           .text('STATUS', sectionStart + margin, currentY);
-
-    this.doc.fillColor('#059669')
-           .fontSize(8)
-           .font('Helvetica-Bold')
-           .text(booking.status?.toUpperCase() || 'CONFIRMED', sectionStart + margin, currentY + 12);
-
-    // Date at bottom
-    const bookingDate = new Date(booking.createdAt).toLocaleDateString('en-GB');
-    this.doc.fillColor('#6B7280')
-           .fontSize(7)
-           .font('Helvetica')
-           .text(bookingDate, sectionStart + margin, pageHeight - 20);
-
-    // Small barcode at bottom
-    this.drawCleanBarcode(booking.verificationCode || 'BARCODE123', sectionStart + margin, pageHeight - 35, 60);
-  }
-
-  drawCleanSeparator(x, y1, x2, y2) {
-    const dashLength = 4;
-    const gapLength = 3;
-    const totalLength = Math.abs(y2 - y1);
-    const numDashes = Math.floor(totalLength / (dashLength + gapLength));
-
-    this.doc.strokeColor('#D1D5DB')
-           .lineWidth(1);
-
-    for (let i = 0; i < numDashes; i++) {
-      const startY = y1 + i * (dashLength + gapLength);
-      const endY = startY + dashLength;
-      this.doc.moveTo(x, startY)
-             .lineTo(x, endY)
-             .stroke();
-    }
-  }
-
-  drawCleanBarcode(data, x, y, width) {
-    const barHeight = 12;
-    const numBars = Math.floor(width / 2);
-    
-    for (let i = 0; i < numBars; i++) {
-      const barWidth = 1.5;
-      const barX = x + (i * barWidth);
-      
-      // Create realistic barcode pattern
-      if (i % 2 === 0 && Math.random() > 0.3) {
-        this.doc.fillColor('#000000')
-               .rect(barX, y, barWidth, barHeight)
-               .fill();
-      }
-    }
   }
 
   formatDate(dateString) {

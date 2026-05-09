@@ -45,20 +45,20 @@ const SimpleFaceCapture = ({ onCapture, onClose, isOpen, title = "Capture Your F
         
         // Wait for video to be ready
         videoRef.current.onloadedmetadata = () => {
-          console.log('Video loaded:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
+          
           setCameraReady(true);
         };
         
         // Handle video errors
         videoRef.current.onerror = (error) => {
-          console.error('Video error:', error);
+          
           setError('Camera error. Please try again.');
           setCameraReady(false);
         };
       }
     } catch (err) {
       setError('Camera access denied. Please allow camera access to continue.');
-      console.error('Camera error:', err);
+      
       setCameraReady(false);
     }
   };
@@ -113,7 +113,7 @@ const SimpleFaceCapture = ({ onCapture, onClose, isOpen, title = "Capture Your F
         setSuccess(false);
       }
     } catch (err) {
-      console.error('Capture error:', err);
+      
       setError('Failed to capture image. Please try again.');
     }
   };
@@ -153,7 +153,7 @@ const SimpleFaceCapture = ({ onCapture, onClose, isOpen, title = "Capture Your F
       
       return (brightnessScore + contrastScore) / 2;
     } catch (error) {
-      console.error('Quality analysis error:', error);
+      
       return 0.5; // Default quality if analysis fails
     }
   };
@@ -171,7 +171,7 @@ const SimpleFaceCapture = ({ onCapture, onClose, isOpen, title = "Capture Your F
         await onCapture(capturedImage, quality);
         onClose();
       } catch (error) {
-        console.error('Face capture error:', error);
+        
         setError('Failed to save face data. Please try again.');
       }
     }

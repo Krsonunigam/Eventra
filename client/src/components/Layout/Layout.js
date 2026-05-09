@@ -24,7 +24,7 @@ const Layout = () => {
         <main className={`flex-1 min-h-screen transition-all duration-300 ease-in-out ${
           sidebarOpen ? 'lg:ml-64' : 'lg:ml-0'
         }`}>
-          <div className={`w-full ${shouldHaveTopPadding ? 'pt-2 pb-8' : 'pb-8'}`}>
+          <div className={`w-full ${shouldHaveTopPadding ? 'pt-24 pb-8' : 'pt-20 pb-8'}`}>
             <Outlet />
           </div>
         </main>

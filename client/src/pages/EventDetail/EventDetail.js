@@ -17,6 +17,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import api from '../../utils/axiosConfig';
+import { useAuth } from '../../contexts/AuthContext';
 import useCustomToast from '../../utils/customToast';
 
 const EventDetail = () => {
@@ -27,12 +28,32 @@ const EventDetail = () => {
   const [isLiked, setIsLiked] = useState(false);
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const [isAlreadyBooked, setIsAlreadyBooked] = useState(false);
+  const [checkingBooking, setCheckingBooking] = useState(false);
 
   useEffect(() => {
     fetchEvent();
+    if (isAuthenticated) {
+      checkBookingStatus();
+    }
     // Scroll to top when component mounts
     window.scrollTo(0, 0);
-  }, [id]);
+  }, [id, isAuthenticated]);
+
+  const checkBookingStatus = async () => {
+    try {
+      setCheckingBooking(true);
+      const response = await api.get('/api/bookings');
+      const bookings = response.data.bookings || [];
+      const booked = bookings.some(b => b.event?._id === id && (b.status === 'confirmed' || b.status === 'pending'));
+      setIsAlreadyBooked(booked);
+    } catch (error) {
+      
+    } finally {
+      setCheckingBooking(false);
+    }
+  };
 
   const fetchEvent = async () => {
     try {
@@ -41,13 +62,13 @@ const EventDetail = () => {
       const response = await api.get(`/api/events/${id}`);
       setEvent(response.data);
     } catch (error) {
-      console.error('Error fetching event from public route:', error);
+      
       // If public route fails, try admin route (for draft events)
       try {
         const adminResponse = await api.get(`/api/admin/events/${id}`);
         setEvent(adminResponse.data);
       } catch (adminError) {
-        console.error('Error fetching event from admin route:', adminError);
+        
         toast.error('Failed to fetch event details');
       }
     } finally {
@@ -74,7 +95,7 @@ const EventDetail = () => {
           url: window.location.href
         });
       } catch (error) {
-        console.error('Error sharing:', error);
+        
       }
     } else {
       navigator.clipboard.writeText(window.location.href);
@@ -280,10 +301,24 @@ const EventDetail = () => {
             {/* Registration Button */}
             <div className="flex items-center space-x-4">
               <button 
-                onClick={() => navigate(`/payment/${id}`)}
-                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                onClick={() => {
+                  if (isAlreadyBooked) {
+                    toast.warning('You have already booked this event', { duration: 4000 });
+                    setTimeout(() => {
+                      navigate('/dashboard');
+                    }, 4000);
+                  } else {
+                    navigate(`/payment/${id}`);
+                  }
+                }}
+                disabled={checkingBooking}
+                className={`flex-1 px-6 py-3 rounded-lg font-medium transition-colors ${
+                  isAlreadyBooked 
+                    ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
+                    : 'bg-cyan-500 hover:bg-cyan-600 text-white'
+                }`}
               >
-                Book Now
+                {checkingBooking ? 'Checking...' : isAlreadyBooked ? 'Already Booked' : 'Book Now'}
               </button>
               <button className="px-6 py-3 border border-gray-600 text-gray-300 hover:border-gray-500 rounded-lg transition-colors">
                 Add to Calendar

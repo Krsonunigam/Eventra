@@ -56,7 +56,7 @@ router.post('/send-verification', async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Send verification error:', error);
+    
     res.status(500).json({ 
       success: false, 
       message: 'Internal server error' 
@@ -98,7 +98,7 @@ router.get('/verify', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Verify email error:', error);
+    
     res.status(500).json({ 
       success: false, 
       message: 'Internal server error' 
@@ -125,7 +125,7 @@ router.get('/status/:email', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Check status error:', error);
+    
     res.status(500).json({ 
       success: false, 
       message: 'Internal server error' 

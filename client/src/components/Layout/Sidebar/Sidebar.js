@@ -10,7 +10,8 @@ import {
   X,
   Settings,
   Activity,
-  FileText
+  FileText,
+  UserCheck
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -38,6 +39,7 @@ const Sidebar = () => {
     { name: 'Admin Dashboard', path: '/admin', icon: BarChart3 },
     { name: 'Manage Events', path: '/admin/events', icon: Calendar },
     { name: 'Manage Users', path: '/admin/users', icon: Users },
+    { name: 'Attendance', path: '/admin/attendance', icon: UserCheck },
     { name: 'Analytics', path: '/admin/analytics', icon: Activity },
     { name: 'Reports', path: '/admin/reports', icon: FileText },
     { name: 'Settings', path: '/settings', icon: Settings },

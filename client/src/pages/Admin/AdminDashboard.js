@@ -19,11 +19,14 @@ import {
   MapPin,
   QrCode,
   Shield,
-  CheckCircle
+  CheckCircle,
+  Scan,
+  RefreshCw
 } from 'lucide-react';
 import api from '../../utils/axiosConfig';
 import useCustomToast from '../../utils/customToast';
 import AdminQRScanner from '../../components/Admin/AdminQRScanner';
+import AdminFaceScanner from '../../components/Admin/AdminFaceScanner';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -42,12 +45,24 @@ const AdminDashboard = () => {
   const [recentBookings, setRecentBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
+  const [faceScannerOpen, setFaceScannerOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [attendanceStats, setAttendanceStats] = useState({});
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  const handleSyncFaces = async () => {
+    try {
+      const response = await api.post('/api/pure-face/sync');
+      if (response.data.success) {
+        toast.success('Face data synchronization started in the background');
+      }
+    } catch (error) {
+      toast.error('Failed to trigger face sync');
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -231,6 +246,20 @@ const AdminDashboard = () => {
               onClick={() => {
                 if (upcomingEvents.length > 0) {
                   setSelectedEvent(upcomingEvents[0]);
+                  setFaceScannerOpen(true);
+                } else {
+                  toast.warning('No upcoming events available for face recognition');
+                }
+              }}
+              className="flex items-center space-x-3 p-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg transition-all shadow-lg shadow-blue-500/20"
+            >
+              <Scan className="h-5 w-5 text-white" />
+              <span className="text-white font-bold">Face Attendance</span>
+            </button>
+            <button
+              onClick={() => {
+                if (upcomingEvents.length > 0) {
+                  setSelectedEvent(upcomingEvents[0]);
                   setQrScannerOpen(true);
                 } else {
                   toast.warning('No upcoming events available for attendance scanning');
@@ -239,8 +268,22 @@ const AdminDashboard = () => {
               className="flex items-center space-x-3 p-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
             >
               <QrCode className="h-5 w-5 text-yellow-400" />
-              <span className="text-white">Scan Attendance</span>
+              <span className="text-white">Scan QR</span>
             </button>
+            <button
+              onClick={handleSyncFaces}
+              className="flex items-center space-x-3 p-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+            >
+              <RefreshCw className="h-5 w-5 text-blue-400" />
+              <span className="text-white">Sync Biometrics</span>
+            </button>
+            <Link
+              to="/admin/attendance"
+              className="flex items-center space-x-3 p-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+            >
+              <CheckCircle className="h-5 w-5 text-emerald-400" />
+              <span className="text-white">Manage Attendance</span>
+            </Link>
             <Link
               to="/settings"
               className="flex items-center space-x-3 p-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
@@ -366,14 +409,31 @@ const AdminDashboard = () => {
               setSelectedEvent(null);
             }}
             onSuccess={(result) => {
-              const studentName = result.attendance?.user?.name || 'Student';
+              const studentName = result.student?.name || result.attendance?.user?.name || 'Student';
               const eventTitle = result.event?.title || selectedEvent?.title || 'Event';
-              toast.success(`${studentName}'s attendance marked successfully for ${eventTitle}!`, { 
-                title: 'Attendance Confirmed',
-                description: `Status: ${result.attendance?.status || 'present'}`
-              });
+              toast.success(`${studentName}'s attendance marked successfully for ${eventTitle}!`);
               
               fetchDashboardData();
+            }}
+            eventId={selectedEvent._id}
+            eventTitle={selectedEvent.title}
+          />
+        )}
+
+        {/* Admin Face Scanner Modal */}
+        {faceScannerOpen && selectedEvent && (
+          <AdminFaceScanner
+            onClose={() => {
+              setFaceScannerOpen(false);
+              setSelectedEvent(null);
+            }}
+            onSwitchToQR={() => {
+              setFaceScannerOpen(false);
+              setQrScannerOpen(true);
+            }}
+            onSuccess={(result) => {
+              fetchDashboardData();
+              toast.success('Face Attendance Processed');
             }}
             eventId={selectedEvent._id}
             eventTitle={selectedEvent.title}

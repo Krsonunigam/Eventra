@@ -39,7 +39,7 @@ export const createRazorpayOptions = (orderData, userData = {}) => {
     },
     modal: {
       ondismiss: () => {
-        console.log('Payment modal dismissed');
+        
       }
     },
     notes: {
@@ -55,7 +55,7 @@ export const openRazorpayModal = (options, onSuccess, onError) => {
       try {
         await onSuccess(response);
       } catch (error) {
-        console.error('Payment handler error:', error);
+        
         onError(error);
       }
     }

@@ -20,41 +20,53 @@ class EmailVerificationService {
     const mailOptions = {
       from: `"Eventra" <${process.env.EMAIL_USER || 'noreply@eventra.com'}>`,
       to: email,
-      subject: 'Verify Your Eventra Account',
+      subject: '🛡️ Verify Your Eventra Account',
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #1e40af, #3b82f6); padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">Welcome to Eventra!</h1>
-          </div>
-          
-          <div style="padding: 30px; background: #f8fafc;">
-            <h2 style="color: #1e40af; margin-top: 0;">Email Verification Required</h2>
-            
-            <p>Thank you for signing up for Eventra! To complete your registration and start managing amazing events, please verify your email address.</p>
-            
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${verificationUrl}" 
-                 style="background: #f97316; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
-                Verify Email Address
-              </a>
-            </div>
-            
-            <p style="color: #64748b; font-size: 14px;">
-              If the button doesn't work, copy and paste this link into your browser:<br>
-              <a href="${verificationUrl}" style="color: #1e40af;">${verificationUrl}</a>
-            </p>
-            
-            <p style="color: #64748b; font-size: 14px;">
-              This verification link will expire in 24 hours for security reasons.
-            </p>
-          </div>
-          
-          <div style="background: #1e40af; padding: 20px; text-align: center; color: white;">
-            <p style="margin: 0; font-size: 14px;">
-              © 2024 Eventra. All rights reserved.
-            </p>
-          </div>
-        </div>
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            .button:hover { background-color: #2563eb !important; transform: translateY(-2px); }
+          </style>
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #050b18; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #ffffff;">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 40px auto; background-color: #0f172a; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+            <tr>
+              <td style="padding: 40px; text-align: center; background: linear-gradient(135deg, #1e40af, #3b82f6);">
+                <h1 style="margin: 0; font-size: 32px; font-weight: 900; letter-spacing: -1px; color: #ffffff;">EVENTRA<span style="color: #fbbf24;">.</span></h1>
+                <p style="margin: 10px 0 0; font-size: 14px; color: rgba(255,255,255,0.8); font-weight: 500;">Your Journey Starts Here</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 50px 40px; text-align: center;">
+                <h2 style="margin: 0 0 20px; font-size: 24px; font-weight: 800; color: #ffffff;">Verify Your Identity</h2>
+                <p style="margin: 0 0 40px; font-size: 16px; line-height: 1.6; color: #94a3b8;">
+                  Welcome to the future of event management! To unlock all features and start your adventure, please verify your email address by clicking the button below.
+                </p>
+                
+                <a href="${verificationUrl}" class="button" style="display: inline-block; padding: 18px 36px; background-color: #3b82f6; color: #ffffff; text-decoration: none; border-radius: 16px; font-size: 16px; font-weight: 700; transition: all 0.3s ease; box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);">
+                  Verify Account
+                </a>
+                
+                <p style="margin: 40px 0 0; font-size: 13px; color: #475569;">
+                  If the button doesn't work, copy and paste this link:<br/>
+                  <a href="${verificationUrl}" style="color: #3b82f6; text-decoration: none;">${verificationUrl}</a>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 30px; background-color: #020617; text-align: center; border-top: 1px solid rgba(255,255,255,0.05);">
+                <p style="margin: 0; font-size: 12px; color: #475569;">
+                  This link will expire in 24 hours. If you didn't create an account, you can safely ignore this email.
+                </p>
+                <p style="margin: 20px 0 0; font-size: 12px; color: #475569; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+                  © 2024 EVENTRA TEAM
+                </p>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
       `
     };
 
@@ -65,20 +77,20 @@ class EmailVerificationService {
     
     if (!hasGmailConfig) {
       // In development, just log the email details
-      console.log('\n📧 ===== VERIFICATION EMAIL (DEVELOPMENT) =====');
-      console.log(`To: ${email}`);
-      console.log(`Subject: Verify Your Eventra Account`);
-      console.log(`Verification URL: ${verificationUrl}`);
-      console.log('==========================================\n');
+      
+      
+      
+      
+      
       return { success: true };
     }
 
     try {
       await transporter.sendMail(mailOptions);
-      console.log('Verification email sent to:', email);
+      
       return { success: true };
     } catch (error) {
-      console.error('Error sending verification email:', error);
+      
       return { success: false, error: error.message };
     }
   }
@@ -115,7 +127,7 @@ class EmailVerificationService {
         message: 'Email verified successfully' 
       };
     } catch (error) {
-      console.error('Error verifying token:', error);
+      
       return { success: false, message: 'Error verifying token' };
     }
   }
@@ -126,7 +138,7 @@ class EmailVerificationService {
       const user = await User.findOne({ email });
       return user ? user.emailVerified : false;
     } catch (error) {
-      console.error('Error checking email verification status:', error);
+      
       return false;
     }
   }
@@ -148,7 +160,7 @@ class EmailVerificationService {
         }
       );
     } catch (error) {
-      console.error('Error cleaning expired tokens:', error);
+      
     }
   }
 }

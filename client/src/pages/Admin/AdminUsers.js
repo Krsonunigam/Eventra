@@ -75,7 +75,7 @@ const AdminUsers = () => {
       setUsers(response.data.users);
       setTotalPages(response.data.pagination.pages);
     } catch (error) {
-      console.error('Error fetching users:', error);
+      
       toast.fetchError('Failed to fetch users');
     } finally {
       setLoading(false);
@@ -87,7 +87,7 @@ const AdminUsers = () => {
       const response = await api.get('/api/admin/users/stats');
       setStats(response.data);
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      
     }
   }, []);
 
@@ -112,15 +112,15 @@ const AdminUsers = () => {
       switch (action) {
         case 'activate':
           await api.put(`/api/admin/users/${userId}/status`, { status: 'active' });
-          toast.updateSuccess('User activated successfully');
+          toast.updateSuccess('user status');
           break;
         case 'deactivate':
           await api.put(`/api/admin/users/${userId}/status`, { status: 'inactive' });
-          toast.updateSuccess('User deactivated successfully');
+          toast.updateSuccess('user status');
           break;
         case 'verify':
           await api.put(`/api/admin/users/${userId}/verify`);
-          toast.updateSuccess('User verified successfully');
+          toast.updateSuccess('user verification');
           break;
         case 'delete':
           const userToDelete = users.find(user => user._id === userId);
@@ -159,8 +159,8 @@ const AdminUsers = () => {
       fetchUsers();
       fetchStats();
     } catch (error) {
-      console.error('Error performing user action:', error);
-      toast.updateError('Failed to perform action');
+      
+      toast.updateError('action');
     }
   };
 
@@ -175,13 +175,13 @@ const AdminUsers = () => {
         userIds: selectedUsers,
         action: action
       });
-      toast.updateSuccess(`Bulk ${action} completed successfully`);
+      toast.updateSuccess(`bulk ${action}`);
       setSelectedUsers([]);
       fetchUsers();
       fetchStats();
     } catch (error) {
-      console.error('Error performing bulk action:', error);
-      toast.updateError('Failed to perform bulk action');
+      
+      toast.updateError('bulk action');
     }
   };
 
@@ -190,14 +190,14 @@ const AdminUsers = () => {
       if (!editingUser) return;
       
       await api.put(`/api/admin/users/${editingUser._id}`, editForm);
-      toast.updateSuccess('User updated successfully');
+      toast.updateSuccess('user');
       setShowEditModal(false);
       setEditingUser(null);
       fetchUsers();
       fetchStats();
     } catch (error) {
-      console.error('Error updating user:', error);
-      toast.updateError('Failed to update user');
+      
+      toast.updateError('user');
     }
   };
 
@@ -217,7 +217,7 @@ const AdminUsers = () => {
       
       toast.success('Users exported successfully');
     } catch (error) {
-      console.error('Error exporting users:', error);
+      
       toast.error('Failed to export users');
     }
   };
@@ -227,13 +227,13 @@ const AdminUsers = () => {
     
     try {
       await api.delete(`/api/admin/users/${userToDelete._id}`);
-      toast.deleteSuccess('User deleted successfully');
+      toast.deleteSuccess('user');
       setShowDeleteModal(false);
       setUserToDelete(null);
       fetchUsers(); // Refresh the users list
     } catch (error) {
-      console.error('Error deleting user:', error);
-      toast.deleteError('Failed to delete user');
+      
+      toast.deleteError('user');
     }
   };
 

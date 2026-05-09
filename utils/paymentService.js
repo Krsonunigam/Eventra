@@ -32,7 +32,7 @@ const createOrder = async (amount, currency = 'INR', receipt) => {
     const order = await rzp.orders.create(options);
     return order;
   } catch (error) {
-    console.error('Error creating Razorpay order:', error);
+    
     throw error;
   }
 };
@@ -54,7 +54,7 @@ const verifyPayment = (razorpay_order_id, razorpay_payment_id, razorpay_signatur
       receivedSignature: razorpay_signature
     };
   } catch (error) {
-    console.error('Error verifying payment:', error);
+    
     throw error;
   }
 };
@@ -70,7 +70,7 @@ const capturePayment = async (paymentId, amount) => {
     const payment = await rzp.payments.capture(paymentId, amount * 100);
     return payment;
   } catch (error) {
-    console.error('Error capturing payment:', error);
+    
     throw error;
   }
 };
@@ -86,7 +86,7 @@ const getPaymentDetails = async (paymentId) => {
     const payment = await rzp.payments.fetch(paymentId);
     return payment;
   } catch (error) {
-    console.error('Error fetching payment details:', error);
+    
     throw error;
   }
 };
@@ -107,7 +107,7 @@ const refundPayment = async (paymentId, amount, notes = '') => {
     });
     return refund;
   } catch (error) {
-    console.error('Error processing refund:', error);
+    
     throw error;
   }
 };
@@ -123,7 +123,7 @@ const getRefundDetails = async (refundId) => {
     const refund = await rzp.payments.fetchRefund(refundId);
     return refund;
   } catch (error) {
-    console.error('Error fetching refund details:', error);
+    
     throw error;
   }
 };
@@ -156,7 +156,7 @@ const generatePaymentLink = async (amount, description, customer) => {
     
     return paymentLink;
   } catch (error) {
-    console.error('Error generating payment link:', error);
+    
     throw error;
   }
 };
@@ -171,7 +171,7 @@ const validateWebhookSignature = (body, signature, secret) => {
     
     return expectedSignature === signature;
   } catch (error) {
-    console.error('Error validating webhook signature:', error);
+    
     return false;
   }
 };

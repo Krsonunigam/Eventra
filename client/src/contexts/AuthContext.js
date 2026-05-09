@@ -1,6 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import api from '../utils/axiosConfig';
-// import useCustomToast from '../utils/customToast'; // Moved to individual components
 
 const AuthContext = createContext();
 
@@ -17,56 +16,80 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
-  // Token is now handled by axiosConfig interceptor
+  const fetchCurrentUser = useCallback(async (authToken = token) => {
+    const config = authToken
+      ? { headers: { Authorization: `Bearer ${authToken}` } }
+      : undefined;
 
-  // Check if user is authenticated on app load
+    const meRes = await api.get('/api/auth/me', config);
+    const freshUser = meRes.data.user;
+    
+    // Cache-busting for profile picture to ensure live updates
+    if (freshUser && freshUser.profilePicture) {
+      const baseUrl = freshUser.profilePicture.split('?')[0];
+      freshUser.profilePicture = `${baseUrl}?t=${Date.now()}`;
+    }
+    
+    setUser(freshUser);
+    return freshUser;
+  }, [token]);
+
   useEffect(() => {
+    let isMounted = true;
+
     const checkAuth = async () => {
       if (token) {
         try {
-          const meRes = await api.get('/api/auth/me');
-          setUser(meRes.data.user);
-        } catch (error) {
-          // Only log error if it's not a 401 (unauthorized) or 404 (not found)
-          if (error.response?.status !== 401 && error.response?.status !== 404) {
-            console.error('Auth check failed:', error);
+          const freshUser = await fetchCurrentUser(token);
+          if (isMounted) {
+            setUser(freshUser);
           }
+        } catch (error) {
           localStorage.removeItem('token');
-          setToken(null);
+          if (isMounted) {
+            setUser(null);
+            setToken(null);
+          }
         }
+      } else if (isMounted) {
+        setUser(null);
       }
-      setLoading(false);
+
+      if (isMounted) {
+        setLoading(false);
+      }
     };
 
     checkAuth();
-  }, [token]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchCurrentUser, token]);
 
   const login = async (email, password) => {
     try {
       setLoading(true);
-      const response = await api.post('/api/auth/login', {
-        email,
-        password
-      });
+      setUser(null);
 
-      const { token: newToken, user: userData, warnings } = response.data;
-      
+      const response = await api.post('/api/auth/login', { email, password });
+      const { token: newToken } = response.data;
+
       localStorage.setItem('token', newToken);
       setToken(newToken);
-      setUser(userData);
-      
-      // Toast notifications will be handled by individual components
-      
-      // Show warnings if any
-      if (warnings && warnings.length > 0) {
-        console.warn('Login warnings:', warnings);
-      }
-      
-      return { success: true, user: userData };
+
+      const freshUser = await fetchCurrentUser(newToken);
+
+      return { success: true, user: freshUser };
     } catch (error) {
-      const message = error.response?.data?.message || 'Login failed';
-      console.error('Login error:', message);
-      return { success: false, error: message };
+      localStorage.removeItem('token');
+      setToken(null);
+      setUser(null);
+
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Login failed'
+      };
     } finally {
       setLoading(false);
     }
@@ -75,54 +98,61 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       setLoading(true);
-      await api.post('/api/auth/register', userData);
-      
-      // Registration success - toast will be handled by component
+
+      const res = await api.post('/api/auth/register', userData);
+
+      if (res.data.token) {
+        localStorage.setItem('token', res.data.token);
+        setToken(res.data.token);
+        await fetchCurrentUser(res.data.token);
+      }
+
       return { success: true };
     } catch (error) {
-      const message = error.response?.data?.message || 'Registration failed';
-      console.error('Registration error:', message);
-      return { success: false, error: message };
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Registration failed'
+      };
     } finally {
       setLoading(false);
     }
   };
 
+  const registerUser = register;
+
   const logout = () => {
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
-    // Token removal is handled by axiosConfig interceptor
-    // Logout success - toast will be handled by component
   };
 
   const updateProfile = async (profileData) => {
     try {
       setLoading(true);
-      console.log('Profile update request data:', profileData);
-      const res = await api.put('/api/auth/profile', profileData);
-      console.log('Profile update response:', res.data);
-      console.log('Updated user data:', res.data.user);
-      console.log('Profile picture URL:', res.data.user?.profilePicture);
 
-      setUser(res.data.user);
-      // Profile update success - toast will be handled by component
+      let dataToSend = profileData;
+
+      if (profileData instanceof FormData) {
+        dataToSend = {};
+        profileData.forEach((value, key) => {
+          dataToSend[key] = value;
+        });
+      }
+
+      if (
+        dataToSend.profilePicture &&
+        typeof dataToSend.profilePicture !== 'string'
+      ) {
+        delete dataToSend.profilePicture;
+      }
+
+      await api.put('/api/auth/profile', dataToSend);
+      await fetchCurrentUser();
+
       return { success: true };
     } catch (error) {
-      console.error('Profile update error:', error);
-      console.error('Error response:', error.response?.data);
-      const message = error.response?.data?.message || 'Profile update failed';
-      const details = error.response?.data?.details || error.response?.data?.errors;
-      console.error('Error details:', details);
-      console.error('Error details array:', Array.isArray(details) ? details : 'Not an array');
-      if (Array.isArray(details) && details.length > 0) {
-        console.error('First validation error:', details[0]);
-        console.error('Validation error field:', details[0]?.field);
-        console.error('Validation error message:', details[0]?.message);
-        console.error('Validation error value:', details[0]?.value);
-      }
-      console.error('Profile update error:', message);
-      return { success: false, error: message };
+      
+      return { success: false };
     } finally {
       setLoading(false);
     }
@@ -135,13 +165,12 @@ export const AuthProvider = ({ children }) => {
         currentPassword,
         newPassword
       });
-      
-      // Password change success - toast will be handled by component
       return { success: true };
     } catch (error) {
-      const message = error.response?.data?.message || 'Password change failed';
-      console.error('Password change error:', message);
-      return { success: false, error: message };
+      return {
+        success: false,
+        error: error.response?.data?.message
+      };
     } finally {
       setLoading(false);
     }
@@ -150,36 +179,22 @@ export const AuthProvider = ({ children }) => {
   const verifyFace = async (faceData) => {
     try {
       setLoading(true);
-      const response = await api.post('/api/auth/verify-face', { faceData });
-      
-      // Update user data
-      const userResponse = await api.get('/api/auth/me');
-      setUser(userResponse.data.user);
-      
-      // Face verification success - toast will be handled by component
-      return { success: true, confidence: response.data.confidence };
+      const res = await api.post('/api/face/verify', { faceData });
+      await fetchCurrentUser();
+
+      return { success: true, confidence: res.data.confidence };
     } catch (error) {
-      const message = error.response?.data?.message || 'Face verification failed';
-      console.error('Face verification error:', message);
-      return { success: false, error: message };
+      return { success: false };
     } finally {
       setLoading(false);
     }
   };
 
-  const updateFaceData = async (faceData) => {
+  const refreshUser = async () => {
     try {
-      setLoading(true);
-      await api.post('/api/auth/update-face', { faceData });
-      
-      // Face data update success - toast will be handled by component
-      return { success: true };
+      return await fetchCurrentUser();
     } catch (error) {
-      const message = error.response?.data?.message || 'Face data update failed';
-      console.error('Face data update error:', message);
-      return { success: false, error: message };
-    } finally {
-      setLoading(false);
+      return null;
     }
   };
 
@@ -191,11 +206,12 @@ export const AuthProvider = ({ children }) => {
     isAdmin: user?.role === 'admin',
     login,
     register,
+    registerUser,
     logout,
     updateProfile,
     changePassword,
     verifyFace,
-    updateFaceData
+    refreshUser
   };
 
   return (

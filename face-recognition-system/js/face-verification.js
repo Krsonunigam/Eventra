@@ -19,7 +19,7 @@ class FaceVerification {
 
     async startVerification() {
         if (this.isVerifying) {
-            console.warn('Verification already in progress');
+            
             return false;
         }
 
@@ -39,12 +39,12 @@ class FaceVerification {
             this.verificationStartTime = Date.now();
             this.verificationResults = null;
 
-            console.log('Starting face verification...');
-            console.log(`Using ${samples.length} trained samples`);
+            
+            
 
             return true;
         } catch (error) {
-            console.error('Failed to start verification:', error);
+            
             this.handleError(error);
             return false;
         }
@@ -53,12 +53,12 @@ class FaceVerification {
     stopVerification() {
         this.isVerifying = false;
         this.verificationResults = null;
-        console.log('Verification stopped');
+        
     }
 
     async verifyCurrentFace() {
         if (!this.isVerifying) {
-            console.warn('Verification not active');
+            
             return false;
         }
 
@@ -68,7 +68,7 @@ class FaceVerification {
             // Get current detection results
             const detectionResults = window.faceDetection.getDetectionResults();
             if (!detectionResults || !detectionResults.detections || detectionResults.detections.length === 0) {
-                console.warn('No face detected for verification');
+                
                 return false;
             }
 
@@ -86,7 +86,7 @@ class FaceVerification {
             // Extract current face features
             const currentFeatures = this.extractVerificationFeatures(currentLandmarks, detectionResults.detections[0]);
             if (!currentFeatures) {
-                console.warn('Could not extract face features');
+                
                 return false;
             }
 
@@ -111,12 +111,12 @@ class FaceVerification {
                 this.completeVerification(false, comparisonResults);
             } else {
                 // Continue verification
-                console.log(`Verification attempt ${this.currentAttempt}/${this.maxAttempts} - Confidence: ${Math.round(comparisonResults.confidence * 100)}%`);
+                
             }
 
             return true;
         } catch (error) {
-            console.error('Error during verification:', error);
+            
             this.handleError(error);
             return false;
         }
@@ -124,7 +124,7 @@ class FaceVerification {
 
     extractVerificationFeatures(landmarks, detection) {
         if (!landmarks || landmarks.length < 468) {
-            console.warn('Insufficient landmarks for verification');
+            
             return null;
         }
 
@@ -264,8 +264,8 @@ class FaceVerification {
 
         this.verificationResults = finalResults;
 
-        console.log(`Verification ${success ? 'successful' : 'failed'} in ${Math.round(verificationTime / 1000)}s`);
-        console.log(`Confidence: ${Math.round(results.confidence * 100)}%`);
+        
+        
 
         if (this.onCompleteCallback) {
             this.onCompleteCallback(finalResults);
@@ -288,16 +288,16 @@ class FaceVerification {
 
     setConfidenceThreshold(threshold) {
         this.confidenceThreshold = Math.max(0, Math.min(1, threshold));
-        console.log(`Confidence threshold set to ${Math.round(this.confidenceThreshold * 100)}%`);
+        
     }
 
     setMaxAttempts(attempts) {
         this.maxAttempts = Math.max(1, attempts);
-        console.log(`Max attempts set to ${this.maxAttempts}`);
+        
     }
 
     handleError(error) {
-        console.error('Verification error:', error);
+        
         
         if (this.onErrorCallback) {
             this.onErrorCallback(error);
@@ -309,7 +309,7 @@ class FaceVerification {
         this.isVerifying = false;
         this.currentAttempt = 0;
         this.verificationResults = null;
-        console.log('Verification reset');
+        
     }
 
     // Export verification results

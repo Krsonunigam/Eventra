@@ -3,11 +3,16 @@ import { motion } from 'framer-motion';
 import { QrCode, X, CheckCircle, AlertCircle, Clock, MapPin, Calendar, User } from 'lucide-react';
 import useCustomToast from '../../utils/customToast';
 import api from '../../utils/axiosConfig';
+import QrScanner from 'qr-scanner';
 
 const QRScanner = ({ onClose, onSuccess, eventId }) => {
   const videoRef = useRef(null);
+  const streamRef = useRef(null);
   const canvasRef = useRef(null);
+  const qrScannerRef = useRef(null);
+  const processingRef = useRef(false);
   const toast = useCustomToast();
+  
   const [isScanning, setIsScanning] = useState(false);
   const [scannedData, setScannedData] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -23,22 +28,31 @@ const QRScanner = ({ onClose, onSuccess, eventId }) => {
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'environment' // Use back camera if available
-        } 
+        video: { facingMode: 'environment' } 
       });
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        setIsScanning(true);
+        streamRef.current = stream;
+        // Fix: Start QrScanner ONLY after video metadata is ready (fixes race condition)
+        videoRef.current.onloadedmetadata = () => {
+          setIsScanning(true);
+          startQRScanner();
+        };
       }
     } catch (error) {
-      console.error('Error accessing camera:', error);
-      toast.error('Camera access denied. Please allow camera permission.');
+      
+      toast.error('Camera access denied. Please allow camera permission or use image upload.');
     }
   };
 
   const stopCamera = () => {
+    if (qrScannerRef.current) {
+      qrScannerRef.current.stop();
+      qrScannerRef.current.destroy();
+      qrScannerRef.current = null;
+    }
+
     if (videoRef.current && videoRef.current.srcObject) {
       const tracks = videoRef.current.srcObject.getTracks();
       tracks.forEach(track => track.stop());
@@ -47,62 +61,101 @@ const QRScanner = ({ onClose, onSuccess, eventId }) => {
     setIsScanning(false);
   };
 
+  const startQRScanner = () => {
+    // Guard: don't create duplicate scanner instances
+    if (!videoRef.current || qrScannerRef.current) return;
+
+    
+    qrScannerRef.current = new QrScanner(
+      videoRef.current,
+      (result) => {
+        const qrText = typeof result === 'string' ? result : result?.data;
+        if (!qrText || processingRef.current) {
+          
+          return;
+        }
+        
+        setScannedData(qrText);
+        processQRCode(qrText);
+      },
+      {
+        highlightScanRegion: true,
+        highlightCodeOutline: true,
+        returnDetailedScanResult: true,
+        preferredCamera: 'environment',
+      }
+    );
+
+    qrScannerRef.current.start().then(() => {
+      
+    }).catch((error) => {
+      
+      toast.error('QR scanner failed to initialize. Try refreshing or using image upload.');
+    });
+  };
+
   const processQRCode = async (qrData) => {
+    if (processingRef.current) return;
+    processingRef.current = true;
     setIsProcessing(true);
     
     try {
-      console.log('Processing QR code:', qrData);
       
-      // Send QR data for attendance marking
+      
+      let payloadQR = qrData;
+      try {
+        payloadQR = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
+        
+      } catch (_) {
+        
+      }
+
+      
       const response = await api.post('/api/attendance/qr-scan', {
-        qrData: qrData
+        qrData: payloadQR
       });
 
+      
+
       if (response.data.success) {
-        setAttendanceResult({
-          success: true,
-          data: response.data
-        });
+        setAttendanceResult({ success: true, data: response.data });
         toast.success('Attendance marked successfully!');
-        
-        // Close scanner after a short delay
-        setTimeout(() => {
-          onSuccess(response.data);
-        }, 2000);
+        setTimeout(() => onSuccess(response.data), 2000);
       } else {
-        setAttendanceResult({
-          success: false,
-          message: response.data.message
-        });
+        setAttendanceResult({ success: false, message: response.data.message });
         toast.error(response.data.message || 'Attendance marking failed');
       }
     } catch (error) {
-      console.error('QR attendance error:', error);
+      
       const errorMessage = error.response?.data?.message || 'Failed to mark attendance';
-      setAttendanceResult({
-        success: false,
-        message: errorMessage
-      });
+      setAttendanceResult({ success: false, message: errorMessage });
       toast.error(errorMessage);
     } finally {
-      setIsProcessing(false);
+      // Allow re-scanning after 3s on failure
+      setTimeout(() => {
+        processingRef.current = false;
+        setIsProcessing(false);
+      }, 3000);
     }
   };
 
   const scanQRCode = () => {
-    // For demo purposes, simulate QR code scanning
-    // In a real app, you would use a QR code scanning library like 'qr-scanner'
-    
-    // Mock QR data for testing - this would come from the event pass QR code
-    const mockQRData = JSON.stringify({
-      bookingId: '68d5e70a742ecd7451d2c0a3',
-      eventId: eventId || '68d5e70a742ecd7451d2c0a4',
-      userId: '68d3af4a1585053c6daee637',
-      verificationCode: 'EVT202501280001'
-    });
+    if (!videoRef.current || isProcessing) return;
 
-    setScannedData(mockQRData);
-    processQRCode(mockQRData);
+    QrScanner.scanImage(videoRef.current, { returnDetailedScanResult: true })
+      .then((result) => {
+        const qrText = typeof result === 'string' ? result : result?.data;
+        if (!qrText) {
+          toast.error('No QR code detected');
+          return;
+        }
+
+        setScannedData(qrText);
+        processQRCode(qrText);
+      })
+      .catch(() => {
+        toast.error('No QR code detected');
+      });
   };
 
   const formatTime = (dateString) => {

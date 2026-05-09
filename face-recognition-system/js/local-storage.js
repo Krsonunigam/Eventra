@@ -40,7 +40,7 @@ class FaceRecognitionStorage {
             const data = localStorage.getItem(this.storageKey);
             return data ? JSON.parse(data) : null;
         } catch (error) {
-            console.error('Error reading from localStorage:', error);
+            
             return null;
         }
     }
@@ -50,7 +50,7 @@ class FaceRecognitionStorage {
             localStorage.setItem(this.storageKey, JSON.stringify(data));
             return true;
         } catch (error) {
-            console.error('Error writing to localStorage:', error);
+            
             return false;
         }
     }
@@ -112,7 +112,7 @@ class FaceRecognitionStorage {
             this.initializeStorage();
             return true;
         } catch (error) {
-            console.error('Error clearing data:', error);
+            
             return false;
         }
     }
@@ -168,7 +168,7 @@ class FaceRecognitionStorage {
 
             return this.setData(mergedData);
         } catch (error) {
-            console.error('Error importing data:', error);
+            
             return false;
         }
     }
@@ -283,7 +283,7 @@ class FaceRecognitionStorage {
             }
             return false;
         } catch (error) {
-            console.error('Error restoring from backup:', error);
+            
             return false;
         }
     }

@@ -33,7 +33,7 @@ router.get('/overview', adminAuth, async (req, res) => {
         startDate.setDate(endDate.getDate() - 30);
     }
 
-    console.log('Analytics overview request:', { dateRange, category, startDate, endDate });
+    
 
     // Build category filter
     const categoryFilter = category !== 'all' ? { category } : {};
@@ -96,14 +96,7 @@ router.get('/overview', adminAuth, async (req, res) => {
 
     const revenue = totalRevenue.length > 0 ? totalRevenue[0].total : 0;
 
-    console.log('Analytics overview results:', {
-      totalUsers,
-      activeUsers,
-      totalEvents,
-      totalBookings,
-      revenue,
-      attendanceRate
-    });
+    
 
     res.json({
       totalUsers,
@@ -116,7 +109,7 @@ router.get('/overview', adminAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Analytics overview error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch analytics overview', error: error.message });
   }
 });
@@ -224,7 +217,7 @@ router.get('/user-growth', adminAuth, async (req, res) => {
     res.json(growthData);
 
   } catch (error) {
-    console.error('User growth analytics error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch user growth data', error: error.message });
   }
 });
@@ -280,7 +273,7 @@ router.get('/event-categories', adminAuth, async (req, res) => {
     res.json(formattedData);
 
   } catch (error) {
-    console.error('Event categories analytics error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch event categories', error: error.message });
   }
 });
@@ -340,7 +333,7 @@ router.get('/revenue-trends', adminAuth, async (req, res) => {
     res.json(formattedData);
 
   } catch (error) {
-    console.error('Revenue trends analytics error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch revenue trends', error: error.message });
   }
 });
@@ -424,7 +417,7 @@ router.get('/attendance', adminAuth, async (req, res) => {
     res.json(formattedData);
 
   } catch (error) {
-    console.error('Attendance analytics error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch attendance data', error: error.message });
   }
 });
@@ -494,7 +487,7 @@ router.get('/popular-events', adminAuth, async (req, res) => {
     res.json(formattedData);
 
   } catch (error) {
-    console.error('Popular events analytics error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch popular events', error: error.message });
   }
 });
@@ -522,7 +515,7 @@ router.get('/recent-activity', adminAuth, async (req, res) => {
     res.json(activities);
 
   } catch (error) {
-    console.error('Recent activity analytics error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch recent activity', error: error.message });
   }
 });
@@ -543,7 +536,7 @@ async function calculateAttendanceRate(startDate, endDate) {
 
     return totalBookings > 0 ? Math.round((attendedBookings / totalBookings) * 100 * 10) / 10 : 0;
   } catch (error) {
-    console.error('Error calculating attendance rate:', error);
+    
     return 0;
   }
 }

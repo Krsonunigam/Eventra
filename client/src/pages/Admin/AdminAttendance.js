@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   QrCode, 
@@ -12,20 +12,25 @@ import {
   Activity,
   BarChart3,
   Download,
-  RefreshCw
+  RefreshCw,
+  Camera,
+  Upload
 } from 'lucide-react';
 import api from '../../utils/axiosConfig';
 import useCustomToast from '../../utils/customToast';
-import AdminQRScanner from '../../components/Admin/AdminQRScanner';
+import AdminHybridScanner from '../../components/Admin/AdminHybridScanner';
+import QrScanner from 'qr-scanner';
 
 const AdminAttendance = () => {
   const toast = useCustomToast();
+  const fileInputRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [qrScannerOpen, setQrScannerOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [attendanceStats, setAttendanceStats] = useState({});
   const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [uploadingQR, setUploadingQR] = useState(false);
 
   useEffect(() => {
     fetchEvents();
@@ -34,11 +39,18 @@ const AdminAttendance = () => {
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/events/admin');
-      setEvents(response.data.events);
+      // Use the priority-sorted endpoint: ongoing > in-window > future
+      const response = await api.get('/api/attendance/events-for-attendance');
+      setEvents(response.data.events || []);
     } catch (error) {
-      console.error('Error fetching events:', error);
-      toast.error('Failed to fetch events');
+      
+      // Fallback to generic events list
+      try {
+        const fallback = await api.get('/api/admin/events');
+        setEvents(fallback.data.events || []);
+      } catch (_) {
+        toast.error('Failed to fetch events');
+      }
     } finally {
       setLoading(false);
     }
@@ -50,7 +62,7 @@ const AdminAttendance = () => {
       setAttendanceStats(response.data);
       setAttendanceRecords(response.data.attendanceRecords || []);
     } catch (error) {
-      console.error('Error fetching attendance stats:', error);
+      
       toast.error('Failed to fetch attendance statistics');
     }
   };
@@ -60,13 +72,77 @@ const AdminAttendance = () => {
     fetchAttendanceStats(event._id);
   };
 
-  const isEventActive = (event) => {
-    const now = new Date();
-    const eventStart = new Date(event.dateTime.start);
-    const attendanceWindow = new Date(eventStart.getTime() - 15 * 60 * 1000);
-    const attendanceWindowEnd = new Date(eventStart.getTime() + 30 * 60 * 1000);
-    
-    return now >= attendanceWindow && now <= attendanceWindowEnd;
+  // Inline QR image upload — no modal needed
+  const handleQRUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !selectedEvent) {
+      if (!selectedEvent) toast.error('Select an event first before uploading a QR code');
+      return;
+    }
+    e.target.value = null; // reset so same file can be re-uploaded
+    setUploadingQR(true);
+    try {
+      const result = await QrScanner.scanImage(file, { returnDetailedScanResult: true });
+      const text = typeof result === 'string' ? result : result?.data;
+      if (!text) throw new Error('No QR code found in image');
+
+      let payload;
+      try { payload = JSON.parse(text); } catch(_) { payload = { verificationCode: text }; }
+      
+
+      const response = await api.post('/api/attendance/admin/qr-scan', {
+        qrData: payload,
+        targetEventId: selectedEvent._id
+      });
+      if (response.data.success) {
+        const name = response.data.student?.name || 'Student';
+        toast.success(`Attendance marked for ${name}`);
+        fetchAttendanceStats(selectedEvent._id);
+      } else {
+        toast.error(response.data.message || 'Could not mark attendance');
+      }
+    } catch (error) {
+      const msg = error?.response?.data?.message || error?.message || 'QR upload failed';
+      const isAlready = error?.response?.data?.alreadyMarked;
+      if (isAlready) toast.warning(msg);
+      else toast.error(msg);
+    } finally {
+      setUploadingQR(false);
+    }
+  };
+
+  const getEventStatus = (event) => {
+    const meta = event._meta;
+    if (!meta) {
+      // Fallback calculation
+      const now = new Date();
+      const start = new Date(event.dateTime.start);
+      const end = event.dateTime.end ? new Date(event.dateTime.end) : start;
+      if (now >= start && now <= end) return 'ongoing';
+      const windowOpen = new Date(start.getTime() - 15 * 60 * 1000);
+      if (now >= windowOpen && now <= start) return 'in-window';
+      return now < start ? 'upcoming' : 'ended';
+    }
+    if (meta.isOngoing) return 'ongoing';
+    if (meta.isInWindow) return 'in-window';
+    if (meta.isUpcoming) return 'upcoming';
+    return new Date() < new Date(event.dateTime.start) ? 'future' : 'ended';
+  };
+
+  const isEventScannable = (event) => {
+    const status = getEventStatus(event);
+    return status === 'ongoing' || status === 'in-window';
+  };
+
+  const getStatusBadge = (event) => {
+    const status = getEventStatus(event);
+    switch (status) {
+      case 'ongoing':   return { label: 'LIVE', cls: 'bg-red-500 text-white animate-pulse' };
+      case 'in-window': return { label: 'OPEN', cls: 'bg-green-600 text-white' };
+      case 'upcoming':  return { label: 'SOON', cls: 'bg-yellow-500 text-black' };
+      case 'future':    return { label: 'Upcoming', cls: 'bg-gray-600 text-gray-300' };
+      default:          return { label: 'Ended', cls: 'bg-gray-700 text-gray-400' };
+    }
   };
 
   const formatDate = (dateString) => {
@@ -165,65 +241,82 @@ const AdminAttendance = () => {
             </div>
 
             <div className="space-y-4">
-              {events.map((event) => (
-                <div
-                  key={event._id}
-                  className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                    selectedEvent?._id === event._id
-                      ? 'border-blue-500 bg-blue-900 bg-opacity-20'
-                      : 'border-gray-600 bg-gray-700 hover:bg-gray-600'
-                  }`}
-                  onClick={() => handleEventSelect(event)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="text-white font-medium mb-2">{event.title}</h3>
-                      <div className="space-y-1 text-sm text-gray-300">
-                        <div className="flex items-center">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          {formatDate(event.dateTime.start)}
-                        </div>
-                        <div className="flex items-center">
-                          <Clock className="h-4 w-4 mr-2" />
-                          {formatTime(event.dateTime.start)}
-                        </div>
-                        <div className="flex items-center">
-                          <MapPin className="h-4 w-4 mr-2" />
-                          {event.venue?.name || 'TBA'}
-                        </div>
-                        <div className="flex items-center">
-                          <Users className="h-4 w-4 mr-2" />
-                          {event.capacity - event.availableSeats} / {event.capacity} attendees
+              {events.length === 0 && (
+                <p className="text-gray-400 text-center py-8">No events found</p>
+              )}
+              {events.map((event) => {
+                const badge = getStatusBadge(event);
+                const scannable = isEventScannable(event);
+                return (
+                  <div
+                    key={event._id}
+                    className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                      selectedEvent?._id === event._id
+                        ? 'border-blue-500 bg-blue-900 bg-opacity-20'
+                        : 'border-gray-600 bg-gray-700 hover:bg-gray-600'
+                    }`}
+                    onClick={() => handleEventSelect(event)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0 mr-3">
+                        <h3 className="text-white font-medium mb-2 truncate">{event.title}</h3>
+                        <div className="space-y-1 text-sm text-gray-300">
+                          <div className="flex items-center">
+                            <Calendar className="h-4 w-4 mr-2 flex-shrink-0" />
+                            {formatDate(event.dateTime.start)}
+                          </div>
+                          <div className="flex items-center">
+                            <Clock className="h-4 w-4 mr-2 flex-shrink-0" />
+                            {formatTime(event.dateTime.start)}
+                          </div>
+                          <div className="flex items-center">
+                            <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
+                            {event.venue?.name || 'TBA'}
+                          </div>
+                          {event._meta && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              Window: {formatTime(event._meta.windowOpen)} – {formatTime(event._meta.windowClose)}
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </div>
-                    <div className="ml-4 text-right">
-                      {isEventActive(event) ? (
-                        <div className="flex flex-col items-end space-y-2">
-                          <span className="px-2 py-1 bg-green-600 text-white text-xs rounded-full">
-                            Active
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedEvent(event);
-                              setQrScannerOpen(true);
-                            }}
-                            className="flex items-center px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
-                          >
-                            <QrCode className="h-4 w-4 mr-1" />
-                            Scan
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="px-2 py-1 bg-gray-600 text-gray-300 text-xs rounded-full">
-                          {new Date() < new Date(event.dateTime.start) ? 'Upcoming' : 'Ended'}
+                      <div className="flex flex-col items-end space-y-2 flex-shrink-0">
+                        <span className={`px-2 py-1 text-xs rounded-full font-bold ${badge.cls}`}>
+                          {badge.label}
                         </span>
-                      )}
+                        {scannable && (
+                          <div className="flex flex-col items-end gap-1.5 mt-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedEvent(event);
+                                setScannerOpen(true);
+                              }}
+                              className="flex items-center px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white text-xs font-medium rounded-lg shadow-lg shadow-emerald-500/20 transition-all"
+                            >
+                              <Camera className="h-3 w-3 mr-1" />
+                              Smart Scan
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedEvent(event);
+                                // Trigger hidden file input
+                                setTimeout(() => fileInputRef.current?.click(), 50);
+                              }}
+                              disabled={uploadingQR}
+                              className="flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-all"
+                            >
+                              <Upload className="h-3 w-3 mr-1" />
+                              {uploadingQR ? 'Scanning...' : 'Upload QR'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </motion.div>
 
@@ -323,18 +416,25 @@ const AdminAttendance = () => {
           </motion.div>
         </div>
 
-        {/* Admin QR Scanner Modal */}
-        {qrScannerOpen && selectedEvent && (
-          <AdminQRScanner
+        {/* Hidden file input for QR upload */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleQRUpload}
+          className="hidden"
+        />
+
+        {/* Admin Hybrid Scanner Modal */}
+        {scannerOpen && selectedEvent && (
+          <AdminHybridScanner
             onClose={() => {
-              setQrScannerOpen(false);
-              setSelectedEvent(null);
+              setScannerOpen(false);
+              // Keep selectedEvent selected for stats view
             }}
             onSuccess={(result) => {
-              toast.success('Student attendance marked successfully!');
-              fetchAttendanceStats(selectedEvent._id); // Refresh attendance data
-              setQrScannerOpen(false);
-              setSelectedEvent(null);
+              fetchAttendanceStats(selectedEvent._id); // Refresh stats live
+              // Do NOT close the scanner — keep scanning same event
             }}
             eventId={selectedEvent._id}
             eventTitle={selectedEvent.title}

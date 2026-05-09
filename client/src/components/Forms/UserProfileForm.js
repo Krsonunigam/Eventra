@@ -66,55 +66,61 @@ const UserProfileForm = ({ user, onSubmit, onPasswordChange, loading = false, is
       reader.readAsDataURL(file);
     }
   };
+// ONLY showing FIXED onFormSubmit part (rest same as your file)
 
-  const onFormSubmit = async (data) => {
-    console.log('Form data before submission:', data);
-    
-    // Handle password change separately if provided
-    if (data.currentPassword && data.newPassword && onPasswordChange) {
-      try {
-        await onPasswordChange(data.currentPassword, data.newPassword);
-      } catch (error) {
-        console.error('Password change error:', error);
-        return; // Don't proceed with profile update if password change fails
-      }
+const onFormSubmit = async (data) => {
+  
+
+  // 🔥 HANDLE PASSWORD
+  if (data.currentPassword && data.newPassword && onPasswordChange) {
+    try {
+      await onPasswordChange(data.currentPassword, data.newPassword);
+    } catch (error) {
+      
+      return;
     }
-    
-    // Remove password fields from profile data
-    const { currentPassword, newPassword, confirmPassword, ...profileData } = data;
-    
-    const formData = {
-      ...profileData,
-      profileImage: profileImage,
-      dateOfBirth: profileData.dateOfBirth ? new Date(profileData.dateOfBirth) : null
-    };
-    
-    // Clean up form data to avoid validation errors
-    if (formData.gender === '') {
-      formData.gender = 'Prefer not to say';
-    }
-    if (formData.bio === '') {
-      delete formData.bio;
-    }
-    
-    // Clean up socialLinks object to remove empty values
-    if (formData.socialLinks) {
-      const cleanedSocialLinks = {};
-      Object.keys(formData.socialLinks).forEach(key => {
-        if (formData.socialLinks[key] && formData.socialLinks[key] !== '') {
-          cleanedSocialLinks[key] = formData.socialLinks[key];
-        }
-      });
-      if (Object.keys(cleanedSocialLinks).length > 0) {
-        formData.socialLinks = cleanedSocialLinks;
-      } else {
-        delete formData.socialLinks;
-      }
-    }
-    
-    console.log('Form data after processing:', formData);
-    onSubmit(formData);
+  }
+
+  // ❌ REMOVE PASSWORD FIELDS
+  const { currentPassword, newPassword, confirmPassword, ...profileData } = data;
+
+  // 🔥 CLEAN OBJECT (NO FormData)
+  const cleanData = {
+    name: profileData.name,
+    email: profileData.email,
+    phoneNumber: profileData.phoneNumber,
+    institute: profileData.institute,
+    role: profileData.role,
+    gender: profileData.gender,
+    dateOfBirth: profileData.dateOfBirth,
   };
+
+  // ✅ Optional fields
+  if (profileData.bio) cleanData.bio = profileData.bio;
+
+  // ✅ Nested objects
+  if (profileData.socialLinks) {
+    cleanData.socialLinks = profileData.socialLinks;
+  }
+
+  if (profileData.notificationPreferences) {
+    cleanData.notificationPreferences = profileData.notificationPreferences;
+  }
+
+  if (profileData.privacySettings) {
+    cleanData.privacySettings = profileData.privacySettings;
+  }
+
+  // 🔥 ADD IMAGE SEPARATELY
+  if (profileImage) {
+    cleanData.profileImage = profileImage;
+  }
+
+  
+
+  // 🚀 SEND CLEAN OBJECT
+  onSubmit(cleanData);
+};
 
   const newPassword = watch('newPassword');
 

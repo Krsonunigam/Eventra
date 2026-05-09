@@ -39,7 +39,7 @@ const FaceRecognitionSetup = ({ onClose, onSuccess, user }) => {
         setIsStreaming(true);
       }
     } catch (error) {
-      console.error('Error accessing camera:', error);
+      
       toast.error('Camera access denied. Please allow camera access to continue.');
     }
   };
@@ -114,7 +114,7 @@ const FaceRecognitionSetup = ({ onClose, onSuccess, user }) => {
         toast.error(error.message || 'Failed to process face sample');
       }
     } catch (error) {
-      console.error('Face recognition setup error:', error);
+      
       toast.error('Face recognition setup failed. Please try again.');
     } finally {
       setIsProcessing(false);

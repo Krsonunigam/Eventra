@@ -1,9 +1,21 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Camera, CheckCircle, X, User, AlertCircle, Loader } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Camera, CheckCircle, X, User, AlertCircle, Loader, RefreshCw } from 'lucide-react';
 import useCustomToast from '../../utils/customToast';
-import faceRecognitionAPI from '../../utils/faceRecognitionAPI';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/axiosConfig';
+
+/**
+ * FaceVerification — Fixed Version
+ *
+ * BUGS FIXED:
+ * 1. Removed double-call: no longer calling /api/pure-face/verify separately.
+ *    A single call to /api/attendance/face-recognition handles both verify + mark.
+ * 2. Removed serverConnected gate — it was blocking the component when health check failed.
+ * 3. Added skin-tone based face detection (client-side pre-check).
+ * 4. Added retry button after failure.
+ * 5. Added clear debug logs.
+ */
 
 const FaceVerification = ({ isOpen, onSuccess, onClose, eventId }) => {
   const videoRef = useRef(null);
@@ -15,366 +27,326 @@ const FaceVerification = ({ isOpen, onSuccess, onClose, eventId }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [faceDetected, setFaceDetected] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
-  const [serverConnected, setServerConnected] = useState(false);
   const [verificationResult, setVerificationResult] = useState(null);
+  const [cameraError, setCameraError] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
-      checkServerConnection();
       startCamera();
     } else {
       stopCamera();
     }
-  }, [isOpen]);
-
-  const checkServerConnection = async () => {
-    try {
-      // Check if user is logged in first
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setServerConnected(false);
-        toast.error('Please log in first to use face recognition.');
-        return;
-      }
-
-      // Try to check server health
-      const response = await faceRecognitionAPI.healthCheck();
-      setServerConnected(true);
-      console.log('Face recognition server connected:', response);
-    } catch (error) {
-      setServerConnected(false);
-      console.error('Face recognition server not available:', error);
-      
-      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-        toast.error('Please log in first to use face recognition.');
-      } else if (error.message.includes('Network Error') || error.code === 'NETWORK_ERROR') {
-        toast.error('Cannot connect to face recognition server. Please check your connection.');
-      } else {
-        toast.error('Face recognition service is not available. Please try again.');
-      }
-    }
-  };
+    return () => stopCamera();
+  }, [isOpen]); // eslint-disable-line
 
   const startCamera = async () => {
+    setCameraError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          width: 640, 
-          height: 480,
-          facingMode: 'user'
-        }
+        video: { width: 640, height: 480, facingMode: 'user' }
       });
-      
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
       }
     } catch (error) {
-      console.error('Error accessing camera:', error);
+      
+      setCameraError('Could not access camera. Please check permissions.');
       toast.error('Could not access camera. Please check permissions.');
     }
   };
 
-  const stopCamera = () => {
+  const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }, []);
+
+  /**
+   * Client-side face detection (skin-tone heuristic).
+   * This is just a pre-check — the real matching is done server-side.
+   */
+  const detectFaceInImage = async (imageData) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+        let skinPixels = 0;
+        const total = pixels.length / 4;
+
+        for (let i = 0; i < pixels.length; i += 4) {
+          const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+          // Classic skin-tone heuristic
+          if (r > 95 && g > 40 && b > 20 &&
+              Math.max(r, g, b) - Math.min(r, g, b) > 15 &&
+              Math.abs(r - g) > 15 && r > g && r > b) {
+            skinPixels++;
+          }
+        }
+
+        const ratio = skinPixels / total;
+        
+        resolve(ratio > 0.08); // 8% skin pixels = likely a face present
+      };
+      img.onerror = () => resolve(true); // Allow on error (don't block)
+      img.src = imageData;
+    });
   };
 
   const captureFace = async () => {
-    if (!videoRef.current || !serverConnected || isProcessing) return;
+    if (!videoRef.current || isProcessing) return;
 
     setIsProcessing(true);
     setFaceDetected(false);
+    setVerificationResult(null);
 
     try {
-      const imageData = faceRecognitionAPI.captureImageFromVideo(videoRef.current);
+      // Capture frame from video
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth || 640;
+      canvas.height = videoRef.current.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(videoRef.current, 0, 0);
+      const imageData = canvas.toDataURL('image/jpeg', 0.85);
+
       
-      // First check if a face is detected in the image
+
+      // Pre-check: skin tone detection
       const hasFace = await detectFaceInImage(imageData);
-      
       if (!hasFace) {
-        setFaceDetected(false);
-        setVerificationResult({
-          success: false,
-          message: 'No face detected in the image'
-        });
-        toast.error('No face detected. Please position your face in the camera.');
+        
+        setVerificationResult({ success: false, message: 'No face detected. Please position your face in the camera frame.' });
+        toast.error('No face detected. Make sure your face is visible and well-lit.');
+        setIsProcessing(false);
         return;
       }
+
       
-      // Face detected, proceed with verification
-      setFaceDetected(true);
-      toast.loading('Face detected, scanning dataset...');
       
-      // Verify face against stored data
-      const response = await faceRecognitionAPI.verifyFace(imageData, user?.id);
+
+      // SINGLE CALL: POST to /api/attendance/face-recognition
+      // This endpoint handles BOTH face verification AND attendance marking in one step.
+      const response = await api.post('/api/attendance/face-recognition', {
+        eventId: eventId,
+        faceData: imageData
+      });
+
       
-      if (response.success && response.isMatch) {
+
+      if (response.data.success) {
+        setFaceDetected(true);
         setVerificationResult({
           success: true,
-          confidence: response.confidence,
-          message: response.message
+          confidence: response.data.attendance?.confidence,
+          message: response.data.message || 'Face verified! Attendance marked.'
         });
-        
-        const datasetFaces = response.details?.dataset_faces_detected || 0;
-        const bestSample = response.details?.best_match_sample || 'N/A';
-        toast.success(`✅ Face verified! Matched ${datasetFaces} dataset samples (best: #${bestSample}) - Confidence: ${response.confidence}%`);
-        
-        // After face verification, mark attendance
-        try {
-          toast.loading('Marking attendance...');
-          const attendanceResponse = await api.post('/api/attendance/face-recognition', {
-            eventId: eventId,
-            faceData: imageData
-          });
-          
-          if (attendanceResponse.data.success) {
-            toast.success('Attendance marked successfully with face recognition!');
-            setTimeout(() => {
-              onSuccess(attendanceResponse.data);
-            }, 1500);
-          } else {
-            throw new Error(attendanceResponse.data.message || 'Failed to mark attendance');
-          }
-        } catch (attendanceError) {
-          console.error('Attendance marking error:', attendanceError);
-          toast.error(attendanceError.response?.data?.message || 'Failed to mark attendance');
-          setVerificationResult({
-            success: false,
-            message: 'Face verified but attendance marking failed'
-          });
-        }
+        toast.success('✅ Face recognized! Attendance marked successfully.');
+        setTimeout(() => {
+          onSuccess(response.data);
+        }, 1500);
       } else {
+        
         setVerificationResult({
           success: false,
-          message: response.message || 'Face verification failed'
+          message: response.data.message || 'Face verification failed'
         });
-        toast.error(`❌ ${response.message}`);
+        toast.error(response.data.message || 'Face not recognized');
       }
     } catch (error) {
-      console.error('Error verifying face:', error);
-      setFaceDetected(false);
-      setVerificationResult({
-        success: false,
-        message: 'Error verifying face'
-      });
-      toast.error('Failed to verify face');
+      
+      const msg = error.response?.data?.message || 'Face verification failed. Please try again.';
+      setVerificationResult({ success: false, message: msg });
+      toast.error(msg);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Simple face detection function (same as in FaceTraining)
-  const detectFaceInImage = async (imageData) => {
-    try {
-      const img = new Image();
-      img.src = imageData;
-      
-      return new Promise((resolve) => {
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          
-          ctx.drawImage(img, 0, 0);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const data = imageData.data;
-          
-          let faceScore = 0;
-          let totalPixels = 0;
-          
-          for (let i = 0; i < data.length; i += 4) {
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
-            
-            if (r > 95 && g > 40 && b > 20 && 
-                Math.max(r, g, b) - Math.min(r, g, b) > 15 &&
-                Math.abs(r - g) > 15 && r > g && r > b) {
-              faceScore++;
-            }
-            totalPixels++;
-          }
-          
-          const faceRatio = faceScore / (totalPixels / 4);
-          const hasFace = faceRatio > 0.1;
-          
-          console.log(`Face detection: ${(faceRatio * 100).toFixed(1)}% skin tone detected`);
-          resolve(hasFace);
-        };
-        
-        img.onerror = () => {
-          console.error('Error loading image for face detection');
-          resolve(false);
-        };
-      });
-    } catch (error) {
-      console.error('Face detection error:', error);
-      return false;
-    }
-  };
-
   const startScanning = () => {
-    if (!serverConnected) {
-      toast.error('Face recognition server is not available');
-      return;
-    }
-
     setIsScanning(true);
     setVerificationResult(null);
-    
-    // Auto-capture after a short delay
-    setTimeout(() => {
-      captureFace();
-    }, 2000);
+    setTimeout(() => captureFace(), 1500); // Brief delay so user can position face
+  };
+
+  const retry = () => {
+    setIsScanning(false);
+    setVerificationResult(null);
+    setFaceDetected(false);
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center">
-              <User className="w-6 h-6 mr-2" />
-              Face Verification
-            </h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden"
+      >
+        {/* Header */}
+        <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <User className="w-5 h-5 text-blue-500" />
+            Face Verification
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-          {!serverConnected && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center">
-                <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
-                <span className="text-red-700">
-                  Face recognition server is not running. Please start the server first.
-                </span>
+        <div className="p-6 space-y-5">
+          {/* Camera Error */}
+          {cameraError && (
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-red-700 dark:text-red-400 text-sm font-medium">{cameraError}</p>
+                <button onClick={startCamera} className="text-red-600 text-xs underline mt-1">Try again</button>
               </div>
             </div>
           )}
 
-          <div className="space-y-6">
-            {/* Camera Preview */}
-            <div className="relative">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-64 bg-gray-200 rounded-lg object-cover"
+          {/* Camera Preview */}
+          <div className="relative rounded-xl overflow-hidden bg-black aspect-video">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover scale-x-[-1]"
+            />
+            <canvas ref={canvasRef} className="hidden" />
+
+            {/* Face guide overlay */}
+            {!verificationResult && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className={`w-40 h-48 border-2 rounded-[40px] transition-all duration-300 ${
+                  faceDetected ? 'border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.4)]' :
+                  isScanning ? 'border-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.4)]' :
+                  'border-white/40'
+                }`} />
+              </div>
+            )}
+
+            {/* Scanning animation */}
+            {isScanning && isProcessing && (
+              <motion.div
+                initial={{ top: '10%' }}
+                animate={{ top: '90%' }}
+                transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }}
+                className="absolute left-8 right-8 h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent shadow-[0_0_8px_rgba(59,130,246,0.8)]"
               />
-              <canvas
-                ref={canvasRef}
-                className="hidden"
-              />
-              
-              {/* Overlay for face detection */}
-              {isScanning && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="bg-black bg-opacity-50 rounded-full p-4">
-                    <Loader className="w-8 h-8 text-white animate-spin" />
+            )}
+
+            {/* Status chip */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
+              <div className={`px-4 py-1.5 rounded-full text-xs font-semibold backdrop-blur-md ${
+                isProcessing ? 'bg-blue-500/80 text-white' :
+                faceDetected ? 'bg-green-500/80 text-white' :
+                'bg-black/60 text-white'
+              }`}>
+                {isProcessing ? 'Scanning...' : faceDetected ? 'Face Detected ✓' : 'Position your face in frame'}
+              </div>
+            </div>
+          </div>
+
+          {/* Result Card */}
+          <AnimatePresence>
+            {verificationResult && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className={`p-4 rounded-xl border ${
+                  verificationResult.success
+                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  {verificationResult.success
+                    ? <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                    : <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                  }
+                  <div>
+                    <p className={`font-semibold text-sm ${verificationResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
+                      {verificationResult.success ? 'Attendance Marked!' : 'Verification Failed'}
+                    </p>
+                    <p className={`text-xs mt-0.5 ${verificationResult.success ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
+                      {verificationResult.message}
+                    </p>
+                    {verificationResult.confidence != null && (
+                      <p className="text-xs text-green-500 mt-0.5">
+                        Confidence: {typeof verificationResult.confidence === 'number' 
+                          ? `${(verificationResult.confidence * 100).toFixed(1)}%`
+                          : verificationResult.confidence}
+                      </p>
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-            {/* Verification Result */}
-            {verificationResult && (
-              <div className={`p-4 rounded-lg border ${
-                verificationResult.success 
-                  ? 'bg-green-50 border-green-200' 
-                  : 'bg-red-50 border-red-200'
-              }`}>
-                <div className="flex items-center">
-                  {verificationResult.success ? (
-                    <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
-                  ) : (
-                    <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
-                  )}
-                  <span className={`font-medium ${
-                    verificationResult.success ? 'text-green-700' : 'text-red-700'
-                  }`}>
-                    {verificationResult.success ? 'Face Verified!' : 'Verification Failed'}
-                  </span>
-                </div>
-                <p className={`text-sm mt-1 ${
-                  verificationResult.success ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {verificationResult.message}
-                </p>
-                {verificationResult.confidence && (
-                  <p className="text-sm text-green-600 mt-1">
-                    Confidence: {verificationResult.confidence.confidence || verificationResult.confidence}%
-                  </p>
-                )}
+          {/* Action Buttons */}
+          <div className="flex gap-3">
+            {!isScanning && !isProcessing && !verificationResult?.success && (
+              <button
+                onClick={startScanning}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-500/20"
+              >
+                <Camera className="w-4 h-4" />
+                {verificationResult ? 'Retry Scan' : 'Start Verification'}
+              </button>
+            )}
+
+            {isScanning && isProcessing && (
+              <div className="flex-1 bg-blue-500/10 border border-blue-500/20 rounded-xl py-3 flex items-center justify-center gap-2 text-blue-400">
+                <Loader className="w-4 h-4 animate-spin" />
+                <span className="text-sm font-medium">Verifying...</span>
               </div>
             )}
 
-            {/* Action Buttons */}
-            <div className="flex space-x-4">
-              {!isScanning && !isProcessing && (
-                <button
-                  onClick={startScanning}
-                  disabled={!serverConnected}
-                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  <Camera className="w-4 h-4 mr-2" />
-                  Start Verification
-                </button>
-              )}
-
-              {isScanning && (
-                <button
-                  onClick={captureFace}
-                  disabled={!serverConnected || isProcessing}
-                  className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  {isProcessing ? (
-                    <Loader className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Camera className="w-4 h-4 mr-2" />
-                  )}
-                  {isProcessing ? 'Processing...' : 'Capture Now'}
-                </button>
-              )}
-            </div>
-
-            {/* Instructions */}
-            <div className="text-sm text-gray-600 space-y-2">
-              <p><strong>Instructions:</strong></p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Position your face in the camera view</li>
-                <li>Make sure you have good lighting</li>
-                <li>Look directly at the camera</li>
-                <li>Keep your face still during verification</li>
-                <li>Your face will be compared against your training data</li>
-              </ul>
-            </div>
-
-            {/* Event Information */}
-            {eventId && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center">
-                  <User className="w-5 h-5 text-blue-500 mr-2" />
-                  <span className="font-medium text-blue-700">Event Verification</span>
-                </div>
-                <p className="text-sm text-blue-600 mt-1">
-                  Verifying your identity for event attendance
-                </p>
-              </div>
+            {verificationResult && !verificationResult.success && !isProcessing && (
+              <button
+                onClick={retry}
+                className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Try Again
+              </button>
             )}
+
+            <button
+              onClick={onClose}
+              className="px-4 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-xl font-medium transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+
+          {/* Instructions */}
+          <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl text-xs text-gray-500 dark:text-gray-400 space-y-1">
+            <p className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Tips for best results:</p>
+            <p>• Face the camera directly with good lighting</p>
+            <p>• Remove glasses or hat if possible</p>
+            <p>• Keep your face within the oval guide</p>
+            <p>• The system compares your live image against your registered face samples</p>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };

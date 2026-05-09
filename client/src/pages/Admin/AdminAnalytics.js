@@ -62,7 +62,7 @@ const AdminAnalytics = () => {
     const fetchAnalyticsData = async () => {
       setLoading(true);
       try {
-        console.log('Fetching analytics data for:', { dateRange, selectedCategory });
+        
         
         const [
           overviewResponse,
@@ -94,15 +94,7 @@ const AdminAnalytics = () => {
           api.get('/api/analytics/recent-activity')
         ]);
 
-        console.log('Analytics data received:', {
-          overview: overviewResponse.data,
-          userGrowth: userGrowthResponse.data,
-          eventCategories: eventCategoriesResponse.data,
-          revenueTrends: revenueTrendsResponse.data,
-          attendance: attendanceResponse.data,
-          popularEvents: popularEventsResponse.data,
-          recentActivity: recentActivityResponse.data
-        });
+        
 
         setAnalyticsData({
           overview: overviewResponse.data,
@@ -114,8 +106,8 @@ const AdminAnalytics = () => {
           recentActivity: recentActivityResponse.data
         });
       } catch (error) {
-        console.error('Error fetching analytics data:', error);
-        console.error('Error details:', error.response?.data);
+        
+        
         toast.error('Failed to fetch analytics data');
       } finally {
         setLoading(false);
@@ -127,7 +119,7 @@ const AdminAnalytics = () => {
 
   const handleExportData = async (type) => {
     try {
-      console.log(`Exporting ${type} data...`);
+      
       
       let exportData = [];
       let filename = '';
@@ -181,7 +173,7 @@ const AdminAnalytics = () => {
       
       toast.success(`${type} data exported successfully`);
     } catch (error) {
-      console.error('Export error:', error);
+      
       toast.error('Failed to export data');
     }
   };

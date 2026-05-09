@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, User, LogOut, Settings, Calendar, Users, BarChart3, PanelLeft, Crown, Mail, Phone, Award, Home, LogIn, CheckCircle } from 'lucide-react';
+import { Menu, X, User, LogOut, Settings, Calendar, Users, BarChart3, PanelLeft, Crown, Phone, Award, LogIn, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useTheme } from '../../../contexts/ThemeContext';
 
@@ -10,67 +10,87 @@ const Navbar = () => {
   const { user, logout, isAuthenticated, isAdmin } = useAuth();
   const { toggleSidebar, sidebarOpen } = useTheme();
   const navigate = useNavigate();
+  const userMenuRef = useRef(null);
+
+  // Close menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    if (userMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [userMenuOpen]);
 
   const handleLogout = () => {
     logout();
     navigate('/');
     setUserMenuOpen(false);
+    setMobileMenuOpen(false);
   };
 
-  const navItems = [
-    // { name: 'Home', path: '/', icon: Home },
+  const navItems = useMemo(() => [
     { name: 'Events', path: '/events', icon: Calendar },
     { name: 'Admin Registration', path: '/admin/subscription', icon: Crown, highlight: true },
     { name: 'Certification', path: '/certification', icon: Award },
-  ];
+  ], []);
 
-  const adminNavItems = [
-    { name: 'Admin Subscription', path: '/admin/subscription', icon: Crown, highlight: true },
-  ];
-
-  const userMenuItems = [
+  const userMenuItems = useMemo(() => [
     { name: 'Dashboard', path: '/dashboard', icon: BarChart3 },
     { name: 'Profile', path: '/profile', icon: User },
     { name: 'Bookings', path: '/bookings', icon: Calendar },
     { name: 'Attendance', path: '/attendance', icon: CheckCircle },
     { name: 'Settings', path: '/settings', icon: Settings },
-  ];
+  ], []);
 
-  const adminMenuItems = [
+  const adminMenuItems = useMemo(() => [
     { name: 'Admin Dashboard', path: '/admin', icon: BarChart3 },
+    { name: 'Profile', path: '/profile', icon: User },
     { name: 'Manage Events', path: '/admin/events', icon: Calendar },
     { name: 'Manage Users', path: '/admin/users', icon: Users },
-    { name: 'Attendance', path: '/attendance', icon: CheckCircle },
+    { name: 'Attendance', path: '/admin/attendance', icon: CheckCircle },
     { name: 'Reports', path: '/admin/reports', icon: BarChart3 },
     { name: 'Subscription', path: '/admin/subscription', icon: Crown },
-  ];
+    { name: 'Settings', path: '/settings', icon: Settings },
+  ], []);
 
   return (
-    <nav className="theme-surface sticky top-0 z-50 transition-colors duration-300">
+    <>
+    <nav className="fixed w-full top-0 z-40 backdrop-blur-xl bg-[#0a0a0a]/80 border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.5)] transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-24">
+        <div className="flex justify-between items-center h-20">
+          
           {/* Left side - Sidebar opener and Logo */}
-          <div className="flex items-center">
+          <div className="flex items-center space-x-2">
             <button
               onClick={toggleSidebar}
-              className={`p-4 rounded-md text-gray-400 hover:text-white hover:bg-gray-800 transition-all duration-200 focus:outline-none ${
-                sidebarOpen ? 'bg-gray-800 text-white' : ''
+              className={`lg:hidden p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-300 focus:outline-none ${
+                sidebarOpen ? 'bg-white/10 text-white shadow-inner' : ''
               }`}
             >
-              {sidebarOpen ? <PanelLeft className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              <PanelLeft className="h-6 w-6" />
             </button>
             
-            <Link to="/" className="flex items-center space-x-2 ml-2 focus:outline-none">
+            <Link to="/" className="flex items-center space-x-2 focus:outline-none group">
               <img 
                 src="/eventra-logo.svg" 
                 alt="Eventra Logo" 
-                className="h-20 w-auto focus:outline-none"
+                className="h-16 w-auto transition-transform duration-300 group-hover:scale-105"
               />
             </Link>
           </div>
 
           {/* Center - Desktop navigation */}
-          <div className="hidden md:flex items-center space-x-12">
+          <div className="hidden md:flex items-center space-x-2">
             {navItems.map((item) => (
               item.external ? (
                 <a
@@ -78,232 +98,242 @@ const Navbar = () => {
                   href={item.path}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`px-5 py-4 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 focus:outline-none ${
+                  className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 flex items-center space-x-2 focus:outline-none ${
                     item.highlight 
-                      ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white hover:from-yellow-500 hover:to-orange-600' 
-                      : 'text-gray-300 hover:text-white'
+                      ? 'bg-gradient-to-r from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-0.5' 
+                      : 'text-gray-300 hover:text-white hover:bg-white/5'
                   }`}
                 >
                   {item.icon && <item.icon className="h-4 w-4" />}
                   <span>{item.name}</span>
-                  {item.highlight && (
-                    <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                      New
-                    </span>
-                  )}
                 </a>
               ) : (
                 <Link
                   key={item.name}
                   to={item.path}
-                  className={`px-5 py-4 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 focus:outline-none ${
+                  className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 flex items-center space-x-2 focus:outline-none ${
                     item.highlight 
-                      ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white hover:from-yellow-500 hover:to-orange-600' 
-                      : 'text-gray-300 hover:text-white'
+                      ? 'bg-gradient-to-r from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-0.5' 
+                      : 'text-gray-300 hover:text-white hover:bg-white/5'
                   }`}
                 >
                   {item.icon && <item.icon className="h-4 w-4" />}
                   <span>{item.name}</span>
-                  {item.highlight && (
-                    <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                      New
-                    </span>
-                  )}
                 </Link>
               )
             ))}
           </div>
 
-          {/* Mobile menu button */}
-          <div className="md:hidden">
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="text-gray-300 hover:text-white p-2 rounded-md focus:outline-none"
+          {/* Right side - Desktop actions */}
+          <div className="hidden md:flex items-center space-x-4">
+            <Link
+              to="/contact"
+              className="text-gray-300 hover:text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 hover:bg-white/5 flex items-center space-x-2 focus:outline-none"
             >
-              <Menu className="h-6 w-6" />
-            </button>
-          </div>
+              <Phone className="h-4 w-4" />
+              <span>Contact</span>
+            </Link>
 
-          {/* Right side - User button and Contact button */}
-          <div className="flex items-center space-x-4">
-            {/* User menu or Auth buttons */}
             {isAuthenticated ? (
-              <div className="relative">
+              <div className="relative" ref={userMenuRef}>
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center space-x-3 text-gray-300 hover:text-white px-5 py-4 rounded-lg text-sm font-medium transition-all duration-200 hover:bg-gray-800/50 border border-gray-700 hover:border-gray-600 focus:outline-none"
+                  className="flex items-center space-x-3 text-gray-300 hover:text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 hover:bg-white/10 border border-transparent hover:border-white/10 focus:outline-none"
                 >
-                  <div className="w-10 h-10 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full flex items-center justify-center">
-                    <User className="h-4 w-4 text-white" />
+                  <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.3)] bg-gradient-to-tr from-gray-800 to-gray-700 flex items-center justify-center">
+                    {user?.profilePicture ? (
+                      <img src={user.profilePicture} alt={user.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="h-5 w-5 text-gray-300" />
+                    )}
                   </div>
-                  <div className="flex flex-col items-start">
+                  <div className="flex flex-col items-start hidden lg:flex">
                     <span className="font-semibold text-white">{user?.name}</span>
-                    <span className="text-xs text-gray-400">{user?.email}</span>
+                    <span className="text-xs text-gray-400 capitalize">{user?.role || 'User'}</span>
                   </div>
                 </button>
 
+                {/* Dropdown Menu */}
                 {userMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1 z-50">
-                    {isAdmin ? (
-                      <>
-                        {adminMenuItems.map((item) => (
-                          <Link
-                            key={item.name}
-                            to={item.path}
-                            className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
-                            onClick={() => setUserMenuOpen(false)}
-                          >
-                            <item.icon className="h-4 w-4" />
-                            <span>{item.name}</span>
-                          </Link>
-                        ))}
-                        <hr className="my-1 border-gray-700" />
-                      </>
-                    ) : (
-                      <>
-                        {userMenuItems.map((item) => (
-                          <Link
-                            key={item.name}
-                            to={item.path}
-                            className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
-                            onClick={() => setUserMenuOpen(false)}
-                          >
-                            <item.icon className="h-4 w-4" />
-                            <span>{item.name}</span>
-                          </Link>
-                        ))}
-                        <hr className="my-1 border-gray-700" />
-                      </>
-                    )}
+                  <div className="absolute right-0 mt-3 w-56 bg-[#111111]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl py-2 z-50 animate-fade-in origin-top-right">
+                    <div className="px-4 py-3 border-b border-white/10 mb-2">
+                      <p className="text-sm text-white font-medium truncate">{user?.name}</p>
+                      <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+                    </div>
                     
-                    <button
-                      onClick={handleLogout}
-                      className="flex items-center space-x-2 w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      <span>Logout</span>
-                    </button>
+                    <div className="px-2">
+                      {(isAdmin ? adminMenuItems : userMenuItems).map((item) => (
+                        <Link
+                          key={item.name}
+                          to={item.path}
+                          className="flex items-center space-x-3 px-3 py-2.5 text-sm text-gray-300 rounded-xl hover:bg-white/10 hover:text-white transition-all duration-200"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.name}</span>
+                        </Link>
+                      ))}
+                    </div>
+                    
+                    <div className="px-2 mt-2 pt-2 border-t border-white/10">
+                      <button
+                        onClick={handleLogout}
+                        className="flex items-center space-x-3 w-full px-3 py-2.5 text-sm text-red-400 rounded-xl hover:bg-red-500/10 transition-all duration-200"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        <span>Sign out</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
                 <Link
                   to="/login"
-                  className="text-gray-300 hover:text-white px-5 py-4 rounded-lg text-sm font-medium transition-all duration-200 hover:bg-gray-800/50 border border-gray-700 hover:border-gray-600 flex items-center space-x-2 focus:outline-none"
+                  className="text-gray-300 hover:text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 hover:bg-white/5 flex items-center space-x-2 focus:outline-none"
                 >
                   <LogIn className="h-4 w-4" />
                   <span>Login</span>
                 </Link>
                 <Link
                   to="/register"
-                  className="bg-gradient-to-r from-cyan-400 to-blue-500 text-white px-7 py-4 rounded-lg text-sm font-semibold hover:from-cyan-500 hover:to-blue-600 transition-all duration-200 shadow-lg hover:shadow-cyan-500/25 transform hover:scale-105 flex items-center space-x-2 focus:outline-none"
+                  className="bg-gradient-to-r from-cyan-400 to-blue-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:from-cyan-500 hover:to-blue-600 transition-all duration-300 shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_25px_rgba(6,182,212,0.5)] hover:-translate-y-0.5 flex items-center space-x-2 focus:outline-none"
                 >
                   <User className="h-4 w-4" />
                   <span>Register</span>
                 </Link>
               </div>
             )}
+          </div>
 
-            {/* Contact Us button */}
-            <Link
-              to="/contact"
-              className="text-gray-300 hover:text-white px-5 py-4 rounded-lg text-sm font-medium transition-all duration-200 hover:bg-gray-800/50 flex items-center space-x-2 focus:outline-none"
+          {/* Mobile menu button */}
+          <div className="md:hidden flex items-center">
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="text-gray-300 hover:text-white p-2 rounded-xl hover:bg-white/10 transition-all duration-300 focus:outline-none relative w-10 h-10 flex items-center justify-center"
             >
-              <Phone className="h-4 w-4" />
-              <span>Contact Us</span>
-            </Link>
+              <div className="absolute transition-transform duration-300">
+                {mobileMenuOpen ? <X className="h-6 w-6 rotate-90 scale-110" /> : <Menu className="h-6 w-6 rotate-0 scale-100" />}
+              </div>
+            </button>
           </div>
         </div>
+      </div>
+    </nav>
 
-        {/* Mobile menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-gray-800">
-              {navItems.map((item) => (
-                item.external ? (
-                  <a
-                    key={item.name}
-                    href={item.path}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`block px-3 py-2 rounded-md text-base font-medium transition-colors flex items-center space-x-2 ${
-                      item.highlight 
-                        ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white' 
-                        : 'text-gray-300 hover:text-white hover:bg-gray-700'
-                    }`}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    {item.icon && <item.icon className="h-5 w-5" />}
-                    <span>{item.name}</span>
-                    {item.highlight && (
-                      <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                        New
-                      </span>
-                    )}
-                  </a>
-                ) : (
+      {/* Mobile menu overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Mobile menu drawer */}
+      <div 
+        className={`md:hidden fixed top-0 right-0 h-full w-4/5 max-w-sm bg-[#0a0a0a]/95 backdrop-blur-2xl border-l border-white/10 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto ${
+          mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="flex flex-col h-full px-6 py-8">
+          <div className="flex justify-between items-center mb-8 pb-4 border-b border-white/10">
+            <span className="text-xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">Menu</span>
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-gray-400 hover:text-white p-2 rounded-xl hover:bg-white/10 transition-all focus:outline-none"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+
+          <div className="space-y-2 mb-8">
+            {navItems.map((item) => (
+            <Link
+              key={item.name}
+              to={item.path}
+              className={`block px-4 py-3 rounded-xl text-base font-medium transition-all duration-300 flex items-center space-x-3 ${
+                item.highlight 
+                  ? 'bg-gradient-to-r from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/20' 
+                  : 'text-gray-300 hover:text-white hover:bg-white/10'
+              }`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              {item.icon && <item.icon className="h-5 w-5" />}
+              <span>{item.name}</span>
+            </Link>
+          ))}
+          
+          <Link
+            to="/contact"
+            className="block px-4 py-3 rounded-xl text-base font-medium text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-300 flex items-center space-x-3"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <Phone className="h-5 w-5" />
+            <span>Contact Us</span>
+          </Link>
+          </div>
+          
+          {isAuthenticated ? (
+            <div className="mt-auto pt-6 border-t border-white/10">
+              <div className="flex items-center space-x-3 mb-6 bg-white/5 p-4 rounded-2xl border border-white/5">
+                <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-emerald-500/50">
+                  {user?.profilePicture ? (
+                    <img src={user.profilePicture} alt={user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="h-full w-full p-2 text-gray-400 bg-gray-800" />
+                  )}
+                </div>
+                <div>
+                  <p className="text-white font-medium">{user?.name}</p>
+                  <p className="text-xs text-gray-400">{user?.email}</p>
+                </div>
+              </div>
+              
+              <div className="space-y-1 mb-6">
+                {(isAdmin ? adminMenuItems : userMenuItems).map((item) => (
                   <Link
                     key={item.name}
                     to={item.path}
-                    className={`block px-3 py-2 rounded-md text-base font-medium transition-colors flex items-center space-x-2 ${
-                      item.highlight 
-                        ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white' 
-                        : 'text-gray-300 hover:text-white hover:bg-gray-700'
-                    }`}
+                    className="flex items-center space-x-3 px-4 py-3 text-sm font-medium text-gray-300 rounded-xl hover:bg-white/10 hover:text-white transition-all"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    {item.icon && <item.icon className="h-5 w-5" />}
+                    <item.icon className="h-5 w-5" />
                     <span>{item.name}</span>
-                    {item.highlight && (
-                      <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                        New
-                      </span>
-                    )}
                   </Link>
-                )
-              ))}
+                ))}
+              </div>
               
-              {/* Contact Us in mobile menu */}
+              <button
+                onClick={handleLogout}
+                className="flex items-center justify-center space-x-2 w-full px-4 py-3.5 text-base font-medium text-red-400 rounded-xl bg-red-500/10 hover:bg-red-500/20 transition-all"
+              >
+                <LogOut className="h-5 w-5" />
+                <span>Sign out</span>
+              </button>
+            </div>
+          ) : (
+            <div className="mt-auto pt-6 border-t border-white/10 space-y-3">
               <Link
-                to="/contact"
-                className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700 transition-colors flex items-center space-x-2"
+                to="/login"
+                className="block px-4 py-3.5 rounded-xl text-base font-medium text-center text-white border border-white/20 hover:bg-white/10 transition-all shadow-sm"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <Phone className="h-5 w-5" />
-                <span>Contact Us</span>
+                Sign In
               </Link>
-              
-              {/* Mobile auth section */}
-              {!isAuthenticated && (
-                <div className="pt-4 border-t border-gray-700">
-                  <div className="flex flex-col space-y-2">
-                    <Link
-                      to="/login"
-                      className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      Login
-                    </Link>
-                    <Link
-                      to="/register"
-                      className="block px-3 py-2 rounded-md text-base font-medium bg-gradient-to-r from-cyan-400 to-blue-500 text-white hover:from-cyan-500 hover:to-blue-600 transition-all duration-200"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      Register
-                    </Link>
-                  </div>
-                </div>
-              )}
+              <Link
+                to="/register"
+                className="block px-4 py-3.5 rounded-xl text-base font-medium text-center bg-gradient-to-r from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/25"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Create Account
+              </Link>
             </div>
-          </div>
-        )}
-
+          )}
+        </div>
       </div>
-    </nav>
+    </>
   );
 };
 
 export default Navbar;
-
-

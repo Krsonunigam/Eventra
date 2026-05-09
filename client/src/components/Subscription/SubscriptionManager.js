@@ -49,7 +49,7 @@ const SubscriptionManager = () => {
         }
       }
     } catch (error) {
-      console.error('Error fetching subscription status:', error);
+      
       if (error.response?.status === 401) {
         toast.error('Please login to access subscription features');
       } else if (error.response?.status === 404) {
@@ -86,19 +86,19 @@ const SubscriptionManager = () => {
           fetchSubscriptionStatus();
           setShowRenewalModal(false);
         } catch (verifyError) {
-          console.error('Payment verification failed:', verifyError);
+          
           toast.error('Payment verification failed. Please contact support.');
         }
       };
 
       const onError = (error) => {
-        console.error('Payment error:', error);
+        
         toast.error('Payment failed. Please try again.');
       };
 
       openRazorpayModal(options, onSuccess, onError);
     } catch (error) {
-      console.error('Error initiating payment:', error);
+      
       toast.error(error.response?.data?.message || 'Failed to initiate payment.');
     } finally {
       setPaymentLoading(false);

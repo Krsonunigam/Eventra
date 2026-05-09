@@ -19,7 +19,7 @@ class AdvancedFaceRecognitionService {
         try {
             // Check if Python script exists
             if (!fs.existsSync(this.pythonScript)) {
-                console.error('Python face recognition script not found at:', this.pythonScript);
+                
                 return false;
             }
             
@@ -62,8 +62,8 @@ class AdvancedFaceRecognitionService {
             
             this.pythonPath = this.findPythonPath(pythonPaths);
             if (!this.pythonPath) {
-                console.error('Python not found. Please install Python 3.8+ and ensure it\'s in your PATH.');
-                console.error('Checked paths:', pythonPaths);
+                
+                
                 return false;
             }
             
@@ -75,15 +75,15 @@ class AdvancedFaceRecognitionService {
                     stdio: 'pipe',
                     timeout: 10000 
                 });
-                console.log('Python environment ready:', this.pythonPath);
-                console.log('Python script test successful');
+                
+                
                 return true;
             } catch (testError) {
-                console.error('Python script test failed:', testError.message);
+                
                 return false;
             }
         } catch (error) {
-            console.error('Error checking Python environment:', error);
+            
             return false;
         }
     }
@@ -97,12 +97,12 @@ class AdvancedFaceRecognitionService {
                 if (path === 'python3' || path === 'python') {
                     // Test command availability
                     execSync(`${path} --version`, { stdio: 'ignore' });
-                    console.log(`Found Python at: ${path}`);
+                    
                     return path;
                 } else {
                     // Test if file exists
                     if (fs.existsSync(path)) {
-                        console.log(`Found Python at: ${path}`);
+                        
                         return path;
                     }
                 }
@@ -113,7 +113,7 @@ class AdvancedFaceRecognitionService {
         }
         
         // Fallback to first path if none found
-        console.warn('No Python path found, using fallback:', pythonPaths[0]);
+        
         return pythonPaths[0];
     }
 
@@ -264,7 +264,7 @@ class AdvancedFaceRecognitionService {
                                 try {
                                     // Enhanced JSON parsing with better error handling
                                     if (!stdout || stdout.trim() === '') {
-                                        console.error('Python returned empty response');
+                                        
                                         resolve({ 
                                             success: false, 
                                             message: 'Face recognition service returned empty response. Please try again.',
@@ -275,7 +275,7 @@ class AdvancedFaceRecognitionService {
                                     
                                     // Check if stdout looks like HTML (proxy error, etc.)
                                     if (stdout.includes('<html>') || stdout.includes('<!DOCTYPE') || stdout.includes('Proxy error') || stdout.includes('502 Bad Gateway') || stdout.includes('503 Service Unavailable') || stdout.includes('nginx') || stdout.includes('Apache')) {
-                                        console.error('Python returned HTML instead of JSON (likely proxy error):', stdout.substring(0, 200) + '...');
+                                        
                                         resolve({ 
                                             success: false, 
                                             message: 'Face recognition service temporarily unavailable. Please try again.',
@@ -287,7 +287,7 @@ class AdvancedFaceRecognitionService {
                                     
                                     // Check for common Python errors in stdout
                                     if (stdout.includes('ModuleNotFoundError') || stdout.includes('ImportError')) {
-                                        console.error('Python module import error:', stdout);
+                                        
                                         resolve({ 
                                             success: false, 
                                             message: 'Face recognition dependencies not installed. Please contact support.',
@@ -297,7 +297,7 @@ class AdvancedFaceRecognitionService {
                                     }
                                     
                                     if (stdout.includes('PermissionError') || stdout.includes('FileNotFoundError')) {
-                                        console.error('Python file access error:', stdout);
+                                        
                                         resolve({ 
                                             success: false, 
                                             message: 'Face recognition service configuration error. Please contact support.',
@@ -309,9 +309,9 @@ class AdvancedFaceRecognitionService {
                                     const result = JSON.parse(stdout);
                                     resolve(result);
                                 } catch (error) {
-                                    console.error('Python stdout (first 500 chars):', stdout.substring(0, 500));
-                                    console.error('JSON parse error:', error);
-                                    console.error('Full stdout length:', stdout.length);
+                                    
+                                    
+                                    
                                     
                                     // Try to extract meaningful error from stdout
                                     let errorMessage = 'Invalid response from Python service';
@@ -333,8 +333,8 @@ class AdvancedFaceRecognitionService {
                                     });
                                 }
                             } else {
-                                console.error('Python stderr:', stderr);
-                                console.error('Python stdout:', stdout);
+                                
+                                
                                 
                                 // Try to provide meaningful error message based on stderr
                                 let errorMessage = `Python process exited with code ${code}`;
@@ -387,7 +387,7 @@ class AdvancedFaceRecognitionService {
                         try {
                             // Enhanced JSON parsing with better error handling
                             if (!stdout || stdout.trim() === '') {
-                                console.error('Python returned empty response');
+                                
                                 resolve({ 
                                     success: false, 
                                     message: 'Face recognition service returned empty response. Please try again.',
@@ -398,7 +398,7 @@ class AdvancedFaceRecognitionService {
                             
                             // Check if stdout looks like HTML (proxy error, etc.)
                             if (stdout.includes('<html>') || stdout.includes('<!DOCTYPE') || stdout.includes('Proxy error') || stdout.includes('502 Bad Gateway') || stdout.includes('503 Service Unavailable') || stdout.includes('nginx') || stdout.includes('Apache')) {
-                                console.error('Python returned HTML instead of JSON (likely proxy error):', stdout.substring(0, 200) + '...');
+                                
                                 resolve({ 
                                     success: false, 
                                     message: 'Face recognition service temporarily unavailable. Please try again.',
@@ -410,7 +410,7 @@ class AdvancedFaceRecognitionService {
                             
                             // Check for common Python errors in stdout
                             if (stdout.includes('ModuleNotFoundError') || stdout.includes('ImportError')) {
-                                console.error('Python module import error:', stdout);
+                                
                                 resolve({ 
                                     success: false, 
                                     message: 'Face recognition dependencies not installed. Please contact support.',
@@ -420,7 +420,7 @@ class AdvancedFaceRecognitionService {
                             }
                             
                             if (stdout.includes('PermissionError') || stdout.includes('FileNotFoundError')) {
-                                console.error('Python file access error:', stdout);
+                                
                                 resolve({ 
                                     success: false, 
                                     message: 'Face recognition service configuration error. Please contact support.',
@@ -432,8 +432,8 @@ class AdvancedFaceRecognitionService {
                             const result = JSON.parse(stdout);
                             resolve(result);
                         } catch (error) {
-                            console.error('Python stdout (first 500 chars):', stdout.substring(0, 500));
-                            console.error('JSON parse error:', error);
+                            
+                            
                             
                             // Try to extract meaningful error from stdout
                             let errorMessage = 'Invalid response from Python service';
@@ -455,8 +455,8 @@ class AdvancedFaceRecognitionService {
                             });
                         }
                     } else {
-                        console.error('Python stderr:', stderr);
-                        console.error('Python stdout:', stdout);
+                        
+                        
                         
                         // Try to provide meaningful error message based on stderr
                         let errorMessage = `Python process exited with code ${code}`;
@@ -510,7 +510,7 @@ class AdvancedFaceRecognitionService {
 
             return result;
         } catch (error) {
-            console.error('Error collecting face samples:', error);
+            
             return {
                 success: false,
                 message: `Error collecting face samples: ${error.message}`
@@ -527,7 +527,7 @@ class AdvancedFaceRecognitionService {
             const result = await this.runPythonScript('train');
             return result;
         } catch (error) {
-            console.error('Error training recognizer:', error);
+            
             return {
                 success: false,
                 message: `Error training recognizer: ${error.message}`
@@ -551,7 +551,7 @@ class AdvancedFaceRecognitionService {
             const result = await this.runPythonScript('recognize', faceData);
             return result;
         } catch (error) {
-            console.error('Error recognizing face:', error);
+            
             return {
                 success: false,
                 message: `Error recognizing face: ${error.message}`
@@ -586,14 +586,14 @@ class AdvancedFaceRecognitionService {
                         await user.save();
                     }
                 } catch (dbError) {
-                    console.warn('Could not update user verification status in database:', dbError.message);
+                    
                     // Continue with verification result even if database update fails
                 }
             }
 
             return result;
         } catch (error) {
-            console.error('Error verifying face:', error);
+            
             return {
                 success: false,
                 isMatch: false,
@@ -612,7 +612,7 @@ class AdvancedFaceRecognitionService {
             const result = await this.runPythonScript('get_samples', userId);
             return result.success ? result.count : 0;
         } catch (error) {
-            console.error('Error getting user samples:', error);
+            
             return 0;
         }
     }
@@ -626,7 +626,7 @@ class AdvancedFaceRecognitionService {
             const result = await this.runPythonScript('get_metadata', userId);
             return result.success ? result.metadata : null;
         } catch (error) {
-            console.error('Error getting user metadata:', error);
+            
             return null;
         }
     }
@@ -653,7 +653,7 @@ class AdvancedFaceRecognitionService {
 
             return result;
         } catch (error) {
-            console.error('Error removing user data:', error);
+            
             return {
                 success: false,
                 message: `Error removing user data: ${error.message}`
@@ -673,7 +673,7 @@ class AdvancedFaceRecognitionService {
             const result = await this.runPythonScript('stats');
             return result;
         } catch (error) {
-            console.error('Error getting system stats:', error);
+            
             return {
                 success: false,
                 message: `Error getting system stats: ${error.message}`

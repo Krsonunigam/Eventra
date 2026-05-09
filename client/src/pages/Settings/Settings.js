@@ -18,8 +18,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import useCustomToast from '../../utils/customToast';
 
 const Settings = () => {
+  const toast = useCustomToast();
   const { user, updateProfile, changePassword } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('notifications');
@@ -135,8 +137,10 @@ const Settings = () => {
         [settingId]: enabled
       };
       await updateProfile({ notificationPreferences: updatedPreferences });
+      toast.success('Notification preferences updated');
     } catch (error) {
-      console.error('Error updating notification preferences:', error);
+      
+      toast.error('Failed to update notifications');
     } finally {
       setLoading(false);
     }
@@ -150,8 +154,10 @@ const Settings = () => {
         [settingId]: value
       };
       await updateProfile({ privacySettings: updatedSettings });
+      toast.success('Privacy settings updated');
     } catch (error) {
-      console.error('Error updating privacy settings:', error);
+      
+      toast.error('Failed to update privacy settings');
     } finally {
       setLoading(false);
     }
@@ -160,16 +166,18 @@ const Settings = () => {
   const handlePasswordChange = async (e) => {
     e.preventDefault();
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      alert('Passwords do not match');
+      toast.error('Passwords do not match');
       return;
     }
 
     try {
       setLoading(true);
       await changePassword(passwordForm.currentPassword, passwordForm.newPassword);
+      toast.success('Password changed successfully');
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (error) {
-      console.error('Error changing password:', error);
+      
+      toast.error(error.response?.data?.message || 'Failed to change password');
     } finally {
       setLoading(false);
     }
@@ -177,12 +185,12 @@ const Settings = () => {
 
   const handleSocialConnect = (provider) => {
     // Implement social account connection
-    console.log(`Connecting ${provider}...`);
+    
   };
 
   const handleSocialDisconnect = (provider) => {
     // Implement social account disconnection
-    console.log(`Disconnecting ${provider}...`);
+    
   };
 
   const renderNotifications = () => (

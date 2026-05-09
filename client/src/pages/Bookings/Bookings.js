@@ -51,7 +51,7 @@ const Bookings = () => {
       const response = await api.get('/api/bookings');
       setBookings(response.data.bookings);
     } catch (error) {
-      console.error('Error fetching bookings:', error);
+      
       toast.error('Failed to fetch bookings');
     } finally {
       setLoading(false);
@@ -76,7 +76,7 @@ const Bookings = () => {
       
       toast.success('Event pass downloaded successfully');
     } catch (error) {
-      console.error('Error generating event pass:', error);
+      
       toast.error('Failed to generate event pass');
     }
   };

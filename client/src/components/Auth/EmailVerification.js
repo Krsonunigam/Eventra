@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
+import useCustomToast from '../../utils/customToast';
 
 const EmailVerification = () => {
+  const toast = useCustomToast();
   const { token: paramToken } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -68,12 +70,12 @@ const EmailVerification = () => {
       const data = await response.json();
 
       if (data.success) {
-        alert('Verification email sent successfully!');
+        toast.success('Verification email sent successfully!');
       } else {
-        alert(data.message);
+        toast.error(data.message || 'Failed to send verification email');
       }
     } catch (error) {
-      alert('Failed to send verification email. Please try again.');
+      toast.error('Failed to send verification email. Please try again.');
     }
   };
 

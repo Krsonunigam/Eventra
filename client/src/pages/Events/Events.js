@@ -79,7 +79,7 @@ const Events = () => {
       setEvents(fetchedEvents);
       setTotalPages(response.data.pagination.pages);
     } catch (error) {
-      console.error('Error fetching events:', error);
+      
       toast.error('Failed to fetch events');
     } finally {
       setLoading(false);

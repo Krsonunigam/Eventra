@@ -10,7 +10,7 @@ const fixAdminUser = async () => {
       useUnifiedTopology: true,
     });
 
-    console.log('Connected to MongoDB');
+    
 
     // Find and update the existing admin user
     const adminUser = await User.findOne({ email: 'adminyadav@eventra.com' });
@@ -20,16 +20,16 @@ const fixAdminUser = async () => {
       adminUser.gender = 'Male';
       adminUser.department = 'Administration';
       await adminUser.save();
-      console.log('Admin user updated successfully!');
+      
     } else {
-      console.log('Admin user not found');
+      
     }
 
   } catch (error) {
-    console.error('Error updating admin user:', error);
+    
   } finally {
     await mongoose.disconnect();
-    console.log('Disconnected from MongoDB');
+    
   }
 };
 

@@ -1,3 +1,0 @@
-Defaulting to user installation because normal site-packages is not writeable
-Requirement already satisfied: opencv-contrib-python in c:\users\based\appdata\roaming\python\python313\site-packages (4.8.1.78)
-Requirement already satisfied: numpy>=1.21.2 in c:\users\based\appdata\roaming\python\python313\site-packages (from opencv-contrib-python) (1.26.4)

@@ -27,7 +27,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import api from '../../utils/axiosConfig';
 import QRScanner from '../../components/Attendance/QRScanner';
 import FaceRecognition from '../../components/FaceRecognition/FaceVerification';
-import faceRecognitionAPI from '../../utils/faceRecognitionAPI';
+// import faceRecognitionAPI from '../../utils/faceRecognitionAPI';
 import useCustomToast from '../../utils/customToast';
 import { formatDateIST, formatTimeIST, formatDateTimeIST, getTimeDifferenceIST, isEventHappeningNow } from '../../utils/timezoneUtils';
 
@@ -50,6 +50,7 @@ const Dashboard = () => {
   const [attendanceMode, setAttendanceMode] = useState(null); // 'qr' or 'face'
   const [isScanning, setIsScanning] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState(null);
+  const [showFaceTraining, setShowFaceTraining] = useState(false);
   const [faceRecognitionStatus, setFaceRecognitionStatus] = useState({
     isSetup: false,
     isVerified: false,
@@ -61,6 +62,24 @@ const Dashboard = () => {
     window.scrollTo(0, 0);
     fetchDashboardData();
   }, []);
+  useEffect(() => {
+  if (user) {
+    const hasCompletedFaceTraining =
+      user.faceTrainingCompleted === true && user.faceDataCollected === true;
+
+    setFaceRecognitionStatus({
+      isSetup: hasCompletedFaceTraining,
+      isVerified: hasCompletedFaceTraining,
+      lastTraining: user?.faceTrainingDate || null
+    });
+  }
+}, [user]);
+useEffect(() => {
+  if (user) {
+    fetchDashboardData();
+  }
+  
+}, [user]);
 
   const fetchDashboardData = async () => {
     try {
@@ -68,7 +87,7 @@ const Dashboard = () => {
       
       // Check if user is authenticated
       if (!user) {
-        console.error('User not authenticated');
+        
         return;
       }
       
@@ -131,24 +150,16 @@ const Dashboard = () => {
       if (user) {
         try {
           // Check face recognition status from the new API
-          const faceResponse = await faceRecognitionAPI.getFaceStatus(user.id);
-          if (faceResponse.success) {
-            const faceStatus = faceResponse.status;
-            setFaceRecognitionStatus({
-              isSetup: faceStatus.has_data || false,
-              isVerified: faceStatus.trained || false,
-              lastTraining: faceStatus.last_training || null
-            });
-          } else {
-            // Fallback to user data if face API not available
-            setFaceRecognitionStatus({
-              isSetup: user.faceDataCollected || false,
-              isVerified: user.isFaceVerified || false,
-              lastTraining: user.faceTrainingDate || null
-            });
-          }
+         const hasCompletedFaceTraining =
+           user.faceTrainingCompleted === true && user.faceDataCollected === true;
+
+         setFaceRecognitionStatus({
+  isSetup: hasCompletedFaceTraining,
+  isVerified: hasCompletedFaceTraining,
+  lastTraining: user?.faceTrainingDate || null
+});
         } catch (error) {
-          console.log('Face recognition API not available, using fallback');
+          
           // Fallback to user data if face API not available
           setFaceRecognitionStatus({
             isSetup: user.faceDataCollected || false,
@@ -159,7 +170,7 @@ const Dashboard = () => {
       }
 
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      
       
       // Set fallback data
       setStats({
@@ -213,17 +224,22 @@ const Dashboard = () => {
     setIsScanning(true);
   };
 
-  const handleFaceRecognition = (eventId) => {
-    // Check if face recognition is set up
-    if (!faceRecognitionStatus.isSetup) {
-      toast.faceRecognitionError('Face recognition not set up. Please complete setup first.');
-      navigate('/face-test');
-      return;
-    }
-    
-    setSelectedEventId(eventId);
-    setAttendanceMode('face');
-  };
+ const handleFaceRecognition = (eventId) => {
+
+  // 🚫 WAIT until user loads
+  if (!user) return;
+
+
+  if (!user.faceTrainingCompleted || !user.faceDataCollected) {
+    toast.error("Please complete face training first");
+    navigate('/face-test');
+    return;
+  }
+
+  // ✅ allow
+  setSelectedEventId(eventId);
+  setAttendanceMode('face');
+};
 
   const handleAttendanceSuccess = (attendanceData = null) => {
     // Show success message with more details if available
@@ -648,10 +664,15 @@ const Dashboard = () => {
                             <Clock className="h-4 w-4 mr-1" />
                             {getTimeAgo(booking.createdAt)}
                           </div>
-                          <div className="flex items-center">
+                          <div className="flex items-center space-x-2">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status)}`}>
                               {booking.status}
                             </span>
+                            {booking.attendanceMarked && (
+                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                Attendance Marked
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="text-right">

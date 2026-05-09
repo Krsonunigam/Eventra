@@ -27,7 +27,7 @@ class FaceLocalStorage {
         return sessionId;
       }
     } catch (error) {
-      console.warn('Could not extract user ID from auth:', error);
+      
     }
 
     // Create a temporary user ID
@@ -47,7 +47,7 @@ class FaceLocalStorage {
       const data = localStorage.getItem(this.storageKey);
       return data ? JSON.parse(data) : {};
     } catch (error) {
-      console.error('Error reading face data:', error);
+      
       return {};
     }
   }
@@ -73,10 +73,10 @@ class FaceLocalStorage {
       };
 
       localStorage.setItem(this.storageKey, JSON.stringify(allData));
-      console.log('Face data saved for user:', userId);
+      
       return true;
     } catch (error) {
-      console.error('Error saving face data:', error);
+      
       return false;
     }
   }
@@ -147,10 +147,10 @@ class FaceLocalStorage {
       const allData = this.getAllFaceData();
       delete allData[userId];
       localStorage.setItem(this.storageKey, JSON.stringify(allData));
-      console.log('Face data cleared for user:', userId);
+      
       return true;
     } catch (error) {
-      console.error('Error clearing face data:', error);
+      
       return false;
     }
   }
@@ -171,7 +171,7 @@ class FaceLocalStorage {
         totalUsers: Object.keys(data).length
       };
     } catch (error) {
-      console.error('Error getting storage info:', error);
+      
       return {
         hasData: false,
         isTrained: false,
@@ -213,7 +213,7 @@ class FaceLocalStorage {
 
       return this.saveFaceData(faceData);
     } catch (error) {
-      console.error('Error importing face data:', error);
+      
       return false;
     }
   }

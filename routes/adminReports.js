@@ -26,7 +26,7 @@ router.get('/test', adminAuth, async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('Test endpoint error:', error);
+    
     res.status(500).json({ message: 'Test failed', error: error.message });
   }
 });
@@ -35,7 +35,7 @@ router.get('/test', adminAuth, async (req, res) => {
 router.get('/stats', adminAuth, async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    console.log('Stats request - startDate:', startDate, 'endDate:', endDate);
+    
     
     const match = {};
     // Only apply date filter if both dates are provided
@@ -50,10 +50,10 @@ router.get('/stats', adminAuth, async (req, res) => {
         $lte: end
       };
       
-      console.log('Date range filter applied:', { start, end });
+      
     }
 
-    console.log('Stats match query:', match);
+    
 
     const stats = await Booking.aggregate([
       { $match: match },
@@ -78,7 +78,7 @@ router.get('/stats', adminAuth, async (req, res) => {
       }
     ]);
 
-    console.log('Stats aggregation result:', stats);
+    
 
     const result = stats[0] || {
       totalBookings: 0,
@@ -89,10 +89,10 @@ router.get('/stats', adminAuth, async (req, res) => {
       refundedBookings: 0
     };
 
-    console.log('Final stats result:', result);
+    
     res.json(result);
   } catch (error) {
-    console.error('Get booking stats error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch booking statistics', error: error.message });
   }
 });
@@ -101,7 +101,7 @@ router.get('/stats', adminAuth, async (req, res) => {
 router.get('/bookings', adminAuth, async (req, res) => {
   try {
     const { startDate, endDate, status, search, page = 1, limit = 50 } = req.query;
-    console.log('Bookings request - params:', { startDate, endDate, status, search, page, limit });
+    
     
     const match = {};
     
@@ -117,7 +117,7 @@ router.get('/bookings', adminAuth, async (req, res) => {
         $lte: end
       };
       
-      console.log('Date range filter applied:', { start, end });
+      
     }
     
     // Status filter
@@ -132,7 +132,7 @@ router.get('/bookings', adminAuth, async (req, res) => {
       ];
     }
 
-    console.log('Bookings match query:', match);
+    
 
     const bookings = await Booking.find(match)
       .populate('user', 'name email studentId institute phoneNumber')
@@ -141,14 +141,8 @@ router.get('/bookings', adminAuth, async (req, res) => {
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit));
 
-    console.log('Found bookings:', bookings.length);
-    console.log('Sample booking:', bookings[0] ? {
-      id: bookings[0]._id,
-      status: bookings[0].status,
-      totalAmount: bookings[0].totalAmount,
-      user: bookings[0].user?.name,
-      event: bookings[0].event?.title
-    } : 'No bookings found');
+    
+    
 
     // If search term provided, filter by user/event names
     let filteredBookings = bookings;
@@ -163,10 +157,10 @@ router.get('/bookings', adminAuth, async (req, res) => {
       });
     }
 
-    console.log('Filtered bookings count:', filteredBookings.length);
+    
     res.json({ bookings: filteredBookings });
   } catch (error) {
-    console.error('Get bookings error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch bookings', error: error.message });
   }
 });
@@ -205,7 +199,7 @@ router.get('/export/pdf', adminAuth, async (req, res) => {
     res.send(pdfBuffer);
 
   } catch (error) {
-    console.error('Export PDF error:', error);
+    
     res.status(500).json({ message: 'Failed to export PDF report', error: error.message });
   }
 });
@@ -283,7 +277,7 @@ router.get('/export/excel', adminAuth, async (req, res) => {
     res.send(buffer);
 
   } catch (error) {
-    console.error('Export Excel error:', error);
+    
     res.status(500).json({ message: 'Failed to export Excel report', error: error.message });
   }
 });

@@ -40,7 +40,7 @@ router.get('/user/upcoming-events', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get upcoming events error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to fetch upcoming events',
       error: error.message 
@@ -82,7 +82,7 @@ router.get('/user/current-events', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get current events error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to fetch current events',
       error: error.message 
@@ -126,7 +126,7 @@ router.get('/user/booking-history', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get booking history error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to fetch booking history',
       error: error.message 
@@ -167,7 +167,7 @@ router.get('/user/payment-history', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get payment history error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to fetch payment history',
       error: error.message 
@@ -210,7 +210,7 @@ router.get('/user/attendance-stats', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get attendance stats error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to fetch attendance statistics',
       error: error.message 
@@ -238,7 +238,7 @@ router.get('/user/favorite-categories', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get favorite categories error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to fetch favorite categories',
       error: error.message 
@@ -277,7 +277,7 @@ router.get('/event/:eventId/availability', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get event availability error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to fetch event availability',
       error: error.message 
@@ -312,7 +312,7 @@ router.get('/user/recent-activity', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get recent activity error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to fetch recent activity',
       error: error.message 
@@ -378,7 +378,7 @@ router.get('/user/recommendations', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get recommendations error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to fetch recommendations',
       error: error.message 

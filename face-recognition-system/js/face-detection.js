@@ -55,9 +55,9 @@ class FaceDetection {
             });
 
             this.isInitialized = true;
-            console.log('MediaPipe Face Detection initialized successfully');
+            
         } catch (error) {
-            console.error('Failed to initialize MediaPipe:', error);
+            
             if (this.onErrorCallback) {
                 this.onErrorCallback(error);
             }
@@ -86,10 +86,10 @@ class FaceDetection {
             });
 
             await this.camera.start();
-            console.log('Camera started successfully');
+            
             return true;
         } catch (error) {
-            console.error('Failed to start camera:', error);
+            
             if (this.onErrorCallback) {
                 this.onErrorCallback(error);
             }
@@ -107,7 +107,7 @@ class FaceDetection {
 
     startDetection() {
         if (!this.isInitialized) {
-            console.error('Face detection not initialized');
+            
             return false;
         }
         this.isDetecting = true;

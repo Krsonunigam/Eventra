@@ -26,13 +26,27 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDateIST, formatTimeIST, formatDateTimeIST } from '../../utils/timezoneUtils';
+import api from '../../utils/axiosConfig';
 
 const Profile = () => {
   const { user } = useAuth();
+  const [attendanceHistory, setAttendanceHistory] = useState([]);
   
-  console.log('Profile component - user data:', user);
-  console.log('Profile component - profilePicture:', user?.profilePicture);
-
+  useEffect(() => {
+    const fetchAttendance = async () => {
+      try {
+        const response = await api.get('/api/attendance/history');
+        if (response.data && response.data.attendance) {
+          setAttendanceHistory(response.data.attendance.slice(0, 5));
+        }
+      } catch (error) {
+        
+      }
+    };
+    if (user) {
+      fetchAttendance();
+    }
+  }, [user]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Not provided';
@@ -89,8 +103,8 @@ const Profile = () => {
                       src={user.profilePicture}
                       alt="Profile"
                       className="w-32 h-32 rounded-full object-cover border-4 border-gray-600 mx-auto"
-                      onLoad={() => console.log('Profile image loaded successfully:', user.profilePicture)}
-                      onError={(e) => console.error('Profile image failed to load:', user.profilePicture, e)}
+                      onLoad={() => {}}
+                      onError={(e) => {}}
                     />
                   ) : (
                     <div className="w-32 h-32 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 flex items-center justify-center mx-auto border-4 border-gray-600">
@@ -377,6 +391,44 @@ const Profile = () => {
                     </div>
                   )}
                 </div>
+              </div>
+              {/* Recent Attendance */}
+              <div className="mt-6">
+                <div className="flex items-center space-x-3 mb-4">
+                  <Activity className="h-5 w-5 text-cyan-400" />
+                  <h4 className="text-lg font-medium text-white">Recent Attendance</h4>
+                </div>
+                
+                {attendanceHistory.length > 0 ? (
+                  <div className="space-y-3">
+                    {attendanceHistory.map((record, index) => (
+                      <div key={index} className="bg-gray-700 rounded-lg p-4 border border-gray-600">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-3 h-3 rounded-full ${
+                              record.status === 'present' ? 'bg-green-400' :
+                              record.status === 'late' ? 'bg-yellow-400' : 'bg-red-400'
+                            }`}></div>
+                            <div>
+                              <p className="text-white font-medium">{record.eventId?.title || 'Unknown Event'}</p>
+                              <p className="text-sm text-gray-400">{formatDateTimeIST(record.timestamp)}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-800 text-gray-300 capitalize">
+                              {record.method}
+                            </span>
+                            <p className="text-xs text-gray-400 mt-1 capitalize">{record.status}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-gray-700 rounded-lg p-4 border border-gray-600">
+                    <p className="text-gray-400 text-center">No attendance records found</p>
+                  </div>
+                )}
               </div>
             </div>
 

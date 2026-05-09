@@ -10,7 +10,7 @@ const fixAllUsers = async () => {
       useUnifiedTopology: true,
     });
 
-    console.log('Connected to MongoDB');
+    
 
     // Find all users that don't have gender set or have empty gender
     const usersToFix = await User.find({
@@ -21,10 +21,10 @@ const fixAllUsers = async () => {
       ]
     });
 
-    console.log(`Found ${usersToFix.length} users that need gender field`);
+    
 
     if (usersToFix.length === 0) {
-      console.log('No users need fixing');
+      
       return;
     }
 
@@ -45,7 +45,7 @@ const fixAllUsers = async () => {
       }
     );
 
-    console.log(`Updated ${updateResult.modifiedCount} users with gender and department`);
+    
 
     // Also fix any users with invalid enum values
     const usersWithInvalidEnums = await User.find({
@@ -55,7 +55,7 @@ const fixAllUsers = async () => {
       ]
     });
 
-    console.log(`Found ${usersWithInvalidEnums.length} users with invalid enum values`);
+    
 
     // Fix role enum issues
     await User.updateMany(
@@ -69,20 +69,20 @@ const fixAllUsers = async () => {
       { $set: { interests: ['Technology'] } }
     );
 
-    console.log('Fixed all enum validation issues');
+    
 
     // List all users after fix
     const allUsers = await User.find({}, 'name email role gender department');
-    console.log('\nAll users in database:');
+    
     allUsers.forEach(user => {
-      console.log(`- ${user.name} (${user.email}) - Role: ${user.role}, Gender: ${user.gender}, Department: ${user.department}`);
+      
     });
 
   } catch (error) {
-    console.error('Error fixing users:', error);
+    
   } finally {
     await mongoose.disconnect();
-    console.log('Disconnected from MongoDB');
+    
   }
 };
 

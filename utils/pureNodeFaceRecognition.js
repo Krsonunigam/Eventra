@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const sharp = require('sharp'); // For image processing
+const axios = require('axios'); // For downloading Cloudinary images
 const User = require('../models/User');
 
 class PureNodeFaceRecognition {
@@ -32,8 +33,13 @@ class PureNodeFaceRecognition {
         this.baseConfidence = 25; // Lower base threshold for better matching
         this.adaptiveThreshold = true; // Enable adaptive thresholds
         this.qualityThreshold = 0.3; // Minimum quality threshold
+        this.minConfidence = 40; // Default minimum confidence for recognition
+        this.minSimilarity = 0.25; // Default minimum similarity
         
-        console.log('✅ Pure Node.js Face Recognition initialized');
+        
+        
+        // Sync Cloudinary profile pictures in the background
+        setTimeout(() => this.syncCloudinaryProfiles(), 5000);
     }
 
     ensureDirectories() {
@@ -65,10 +71,10 @@ class PureNodeFaceRecognition {
                     });
                 }
                 
-                console.log(`📊 Loaded metadata for ${this.userMapping.size} users`);
+                
             }
         } catch (error) {
-            console.error('❌ Error loading metadata:', error.message);
+            
         }
     }
 
@@ -95,9 +101,9 @@ class PureNodeFaceRecognition {
             };
             
             fs.writeFileSync(metadataFile, JSON.stringify(data, null, 2));
-            console.log('💾 Metadata saved successfully');
+            
         } catch (error) {
-            console.error('❌ Error saving metadata:', error.message);
+            
         }
     }
 
@@ -134,7 +140,7 @@ class PureNodeFaceRecognition {
             
             return processed;
         } catch (error) {
-            console.error('❌ Error processing image:', error.message);
+            
             throw new Error(`Failed to process image: ${error.message}`);
         }
     }
@@ -152,20 +158,20 @@ class PureNodeFaceRecognition {
             
             // More lenient validation - allow wider range of brightness
             if (brightness < 0.02 || brightness > 0.98) {
-                console.log(`⚠️  Image too dark/bright: ${(brightness * 100).toFixed(1)}%`);
+                
                 return null;
             }
             
             // Check for reasonable contrast (more lenient)
             if (contrast < 0.05) {
-                console.log(`⚠️  Image too low contrast: ${(contrast * 100).toFixed(1)}%`);
+                
                 return null;
             }
             
             const quality = this.calculateQuality(imageBuffer, brightness, contrast);
             
-            console.log(`📸 Face detection: brightness=${(brightness * 100).toFixed(1)}%, contrast=${(contrast * 100).toFixed(1)}%, quality=${quality.toFixed(2)}`);
-            console.log(`📸 Image features: ${features.length} feature points extracted`);
+            
+            
             
             return {
                 features,
@@ -175,7 +181,7 @@ class PureNodeFaceRecognition {
                 hash: this.calculateImageHash(imageBuffer) // Keep for backward compatibility
             };
         } catch (error) {
-            console.error('❌ Error detecting face:', error.message);
+            
             return null;
         }
     }
@@ -207,7 +213,7 @@ class PureNodeFaceRecognition {
 
             return features;
         } catch (error) {
-            console.error('❌ Error extracting features:', error.message);
+            
             return [];
         }
     }
@@ -409,7 +415,7 @@ class PureNodeFaceRecognition {
 
     async collectFaceSamples(userId, faceDataList) {
         try {
-            console.log(`📸 Collecting face samples for user: ${userId}`);
+            
             
             // Validate input
             if (!faceDataList || !Array.isArray(faceDataList) || faceDataList.length < this.minSamples) {
@@ -442,12 +448,12 @@ class PureNodeFaceRecognition {
                     const faceData = await this.detectFace(processedImage);
                     
                     if (!faceData) {
-                        console.log(`⚠️  Skipping sample ${i + 1} - no valid face detected`);
+                        
                         continue;
                     }
 
                     if (faceData.quality < 0.3) {
-                        console.log(`⚠️  Skipping sample ${i + 1} - quality too low: ${faceData.quality}`);
+                        
                         continue;
                     }
 
@@ -462,10 +468,10 @@ class PureNodeFaceRecognition {
                     sampleHashes.push(faceData.hash);
                     sampleFeatures.push(faceData.features); // Store features for better matching
                     
-                    console.log(`✅ Saved sample ${successfulSamples} with quality ${faceData.quality.toFixed(2)} and ${faceData.features.length} features`);
+                    
                     
                 } catch (error) {
-                    console.error(`❌ Error processing sample ${i + 1}:`, error.message);
+                    
                 }
             }
 
@@ -505,13 +511,13 @@ class PureNodeFaceRecognition {
                     faceTrainingCompleted: true,
                     faceTrainingDate: new Date()
                 });
-                console.log('💾 Database updated successfully');
+                
             } catch (dbError) {
-                console.warn('⚠️  Database update failed:', dbError.message);
+                
             }
 
-            console.log(`✅ Face sample collection completed for user ${userId}`);
-            console.log(`📊 Samples: ${successfulSamples}, Quality: ${qualityLevel} (${avgQuality.toFixed(2)})`);
+            
+            
 
             return {
                 success: true,
@@ -528,7 +534,7 @@ class PureNodeFaceRecognition {
             };
 
         } catch (error) {
-            console.error('❌ Error collecting face samples:', error.message);
+            
             return {
                 success: false,
                 message: `Error collecting face samples: ${error.message}`
@@ -538,11 +544,11 @@ class PureNodeFaceRecognition {
 
     async detectFacesFromDataset(userIdStr) {
         try {
-            console.log(`📸 Detecting faces from dataset for user ${userIdStr}...`);
+            
             
             const userMetadata = this.userMetadata.get(userIdStr);
             if (!userMetadata) {
-                console.log(`❌ No metadata found for user ${userIdStr}`);
+                
                 return [];
             }
 
@@ -564,28 +570,28 @@ class PureNodeFaceRecognition {
                                 faceData: faceData,
                                 path: samplePath
                             });
-                            console.log(`✅ Face detected in sample ${i}`);
+                            
                         } else {
-                            console.log(`⚠️  No face detected in sample ${i}`);
+                            
                         }
                     } catch (error) {
-                        console.error(`❌ Error processing sample ${i}:`, error.message);
+                        
                     }
                 }
             }
             
-            console.log(`📊 Dataset face detection complete: ${detectedFaces.length}/${sampleCount} samples have detectable faces`);
+            
             return detectedFaces;
             
         } catch (error) {
-            console.error('❌ Error detecting faces from dataset:', error.message);
+            
             return [];
         }
     }
 
     async verifyFace(faceData, userId) {
         try {
-            console.log(`🔍 Verifying face for user: ${userId}`);
+            
             
             const userIdStr = String(userId);
             
@@ -600,7 +606,7 @@ class PureNodeFaceRecognition {
             }
 
             // Step 1: Detect faces from dataset samples first
-            console.log(`📸 Step 1: Detecting faces from dataset...`);
+            
             const datasetFaces = await this.detectFacesFromDataset(userIdStr);
             if (!datasetFaces || datasetFaces.length === 0) {
                 return {
@@ -610,10 +616,10 @@ class PureNodeFaceRecognition {
                     message: 'No faces detected in dataset samples'
                 };
             }
-            console.log(`✅ Found ${datasetFaces.length} faces in dataset`);
+            
 
             // Step 2: Process and detect face in input image
-            console.log(`📸 Step 2: Detecting face in input image...`);
+            
             const processedImage = await this.processImage(faceData);
             const inputFaceData = await this.detectFace(processedImage);
             
@@ -625,102 +631,69 @@ class PureNodeFaceRecognition {
                     message: 'No face detected in input image'
                 };
             }
-            console.log(`✅ Face detected in input image`);
+            
 
             // Step 3: Compare input face with dataset faces
-            console.log(`🔄 Step 3: Comparing input face with ${datasetFaces.length} dataset faces...`);
+            
 
-            // Calculate similarity based on feature comparison with detected dataset faces
             let maxSimilarity = 0;
+            let minEuclideanDistance = 100; // Large initial value
             let bestMatchIndex = -1;
             const similarities = [];
             
-            console.log(`🔍 Comparing input face against ${datasetFaces.length} detected dataset faces`);
-            console.log(`📸 Input features: ${inputFaceData.features.length} feature points`);
-            
             // Compare with detected dataset faces
             if (datasetFaces.length > 0 && inputFaceData.features.length > 0) {
-                console.log(`🎯 Using feature-based comparison with detected faces`);
-                
                 for (let i = 0; i < datasetFaces.length; i++) {
                     const datasetFace = datasetFaces[i];
+                    
+                    // 1. Calculate weighted similarity (existing logic)
                     const similarity = this.calculateFeatureSimilarity(inputFaceData.features, datasetFace.faceData.features);
                     similarities.push(similarity);
                     
-                    if (similarity > maxSimilarity) {
-                        maxSimilarity = similarity;
+                    // 2. Calculate raw Euclidean distance for the user's specific requirement
+                    const rawDistance = this.calculateRawEuclideanDistance(inputFaceData.features, datasetFace.faceData.features);
+                    if (rawDistance < minEuclideanDistance) {
+                        minEuclideanDistance = rawDistance;
                         bestMatchIndex = i;
                     }
                     
-                    console.log(`📊 Dataset sample ${datasetFace.sampleIndex}: ${similarity.toFixed(3)} (${(similarity * 100).toFixed(1)}%)`);
+                    if (similarity > maxSimilarity) {
+                        maxSimilarity = similarity;
+                    }
+                    
+                    
                 }
-
-                // Security analysis: Check similarity distribution
-                const securityAnalysis = this.analyzeSimilarityDistribution(similarities);
-                console.log(`🔒 Security analysis: ${securityAnalysis.message}`);
-                
-                // Apply security checks (more lenient)
-                if (securityAnalysis.isSuspicious) {
-                    console.log(`⚠️  Suspicious similarity pattern detected - applying mild adjustment`);
-                    maxSimilarity = Math.min(maxSimilarity, 0.8); // More lenient cap for suspicious patterns
-                }
-                
-            } else {
-                // Fallback: No features available, return error
-                console.log(`❌ No features available for comparison`);
-                return {
-                    success: false,
-                    isMatch: false,
-                    confidence: 0,
-                    message: 'No features available for comparison'
-                };
             }
 
-            // Calculate confidence based on similarity and quality
-            const baseConfidence = maxSimilarity * 100;
-            const qualityBonus = inputFaceData.quality * 10;
-            let confidence = Math.min(95, baseConfidence + qualityBonus);
-
-            // Calculate adaptive threshold based on user's historical data
-            const adaptiveThreshold = this.calculateAdaptiveThreshold(userIdStr, similarities, inputFaceData);
-            console.log(`🎯 Adaptive threshold: ${adaptiveThreshold.toFixed(1)}%`);
-
-            // Apply intelligent validation
-            const intelligentValidation = this.performIntelligentValidation(maxSimilarity, similarities, inputFaceData, adaptiveThreshold);
-            console.log(`🧠 Intelligent validation: ${intelligentValidation.message}`);
+            // USER REQUIREMENT: Match if distance < 0.5
+            const distanceMatch = minEuclideanDistance < 0.5;
             
-            if (intelligentValidation.adjustment !== 0) {
-                confidence += intelligentValidation.adjustment;
-                console.log(`📊 Validation adjustment: ${intelligentValidation.adjustment > 0 ? '+' : ''}${intelligentValidation.adjustment.toFixed(1)}%`);
-            }
+            // Calculate confidence
+            const baseConfidence = maxSimilarity * 100;
+            const distanceConfidence = distanceMatch ? 90 : Math.max(0, (1 - minEuclideanDistance) * 100);
+            let confidence = Math.max(baseConfidence, distanceConfidence);
+            
+            // Apply threshold
+            const isMatch = distanceMatch || confidence >= this.minConfidence;
 
-            const isMatch = confidence >= adaptiveThreshold;
-
-            console.log(`📊 Verification result: ${isMatch ? 'MATCH' : 'NO MATCH'} (${confidence.toFixed(1)}%)`);
-            console.log(`📊 Best similarity: ${maxSimilarity.toFixed(3)} (${(maxSimilarity * 100).toFixed(1)}%)`);
-            console.log(`📊 Quality bonus: ${qualityBonus.toFixed(1)}%`);
-            console.log(`📊 Final confidence: ${confidence.toFixed(1)}%`);
-            console.log(`📊 Min confidence threshold: ${this.minConfidence}%`);
-            console.log(`📊 Best match sample: ${bestMatchIndex + 1}`);
+            
 
             return {
                 success: true,
                 isMatch,
                 confidence: Math.round(confidence * 10) / 10,
                 message: isMatch 
-                    ? `Face verified! Matched ${datasetFaces.length} dataset faces with ${confidence.toFixed(1)}% confidence`
-                    : `Face verification failed. No match found in ${datasetFaces.length} dataset faces`,
+                    ? `Face verified! (Distance: ${minEuclideanDistance.toFixed(3)})`
+                    : `Face verification failed. (Best Distance: ${minEuclideanDistance.toFixed(3)})`,
                 details: {
-                    dataset_faces_detected: datasetFaces.length,
-                    best_match_sample: datasetFaces[bestMatchIndex]?.sampleIndex || 'N/A',
-                    feature_similarity: maxSimilarity,
-                    quality: inputFaceData.quality,
-                    adaptive_threshold: adaptiveThreshold
+                    min_distance: minEuclideanDistance,
+                    is_distance_match: distanceMatch,
+                    best_match_sample: datasetFaces[bestMatchIndex]?.sampleIndex || 'N/A'
                 }
             };
 
         } catch (error) {
-            console.error('❌ Error verifying face:', error.message);
+            
             return {
                 success: false,
                 isMatch: false,
@@ -846,8 +819,17 @@ class PureNodeFaceRecognition {
     }
 
     calculateEuclideanSimilarity(features1, features2) {
+        const distance = this.calculateRawEuclideanDistance(features1, features2);
+        const minLength = Math.min(features1.length, features2.length);
+        const maxPossibleDistance = Math.sqrt(minLength * 4); // Assuming features are in range [-1, 1]
+        const similarity = 1 - (distance / maxPossibleDistance);
+        
+        return Math.max(0, Math.min(1.0, similarity));
+    }
+
+    calculateRawEuclideanDistance(features1, features2) {
         if (!features1 || !features2 || features1.length === 0 || features2.length === 0) {
-            return 0;
+            return 100;
         }
 
         const minLength = Math.min(features1.length, features2.length);
@@ -858,11 +840,7 @@ class PureNodeFaceRecognition {
             sumSquaredDiffs += diff * diff;
         }
         
-        const euclideanDistance = Math.sqrt(sumSquaredDiffs);
-        const maxPossibleDistance = Math.sqrt(minLength * 4); // Assuming features are in range [-1, 1]
-        const similarity = 1 - (euclideanDistance / maxPossibleDistance);
-        
-        return Math.max(0, Math.min(1.0, similarity));
+        return Math.sqrt(sumSquaredDiffs);
     }
 
     calculateManhattanSimilarity(features1, features2) {
@@ -1039,7 +1017,7 @@ class PureNodeFaceRecognition {
         const minSim = Math.min(...similarities);
         const range = maxSim - minSim;
 
-        console.log(`📊 Similarity stats: mean=${mean.toFixed(3)}, stdDev=${stdDev.toFixed(3)}, range=${range.toFixed(3)}`);
+        
 
         // Security checks for impersonation detection (more lenient for legitimate matches)
         const checks = {
@@ -1260,9 +1238,95 @@ class PureNodeFaceRecognition {
         return variance;
     }
 
+    async syncCloudinaryProfiles() {
+        try {
+            
+            const users = await User.find({ profilePicture: { $ne: null } }).select('_id name profilePicture');
+            
+            
+            
+            let syncedCount = 0;
+            for (const user of users) {
+                const userIdStr = String(user._id);
+                
+                // If user doesn't have local face data or has very few samples
+                const metadata = this.userMetadata.get(userIdStr);
+                if (!metadata || metadata.sample_count < 1) {
+                    
+                    const success = await this.addCloudinarySample(userIdStr, user.profilePicture);
+                    if (success) syncedCount++;
+                }
+            }
+            
+            if (syncedCount > 0) {
+                
+                this.saveMetadata();
+            } else {
+                
+            }
+        } catch (error) {
+            
+        }
+    }
+
+    async addCloudinarySample(userId, imageUrl) {
+        try {
+            // Download image
+            const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+            const buffer = Buffer.from(response.data);
+            
+            // Process image
+            const processedImage = await this.processImage(buffer);
+            const faceData = await this.detectFace(processedImage);
+            
+            if (!faceData || faceData.quality < 0.2) {
+                
+                return false;
+            }
+
+            const userIdStr = String(userId);
+            let internalId = this.getUserId(userIdStr);
+            if (!internalId) {
+                internalId = this.getNextInternalId();
+                this.userMapping.set(userIdStr, internalId);
+            }
+
+            // Save sample locally
+            const sampleFilename = `user_${userIdStr}_profile_sync.jpg`;
+            const samplePath = path.join(this.datasetPath, sampleFilename);
+            fs.writeFileSync(samplePath, processedImage);
+
+            // Update metadata
+            const existingMetadata = this.userMetadata.get(userIdStr) || {
+                internal_id: internalId,
+                created_at: new Date().toISOString(),
+                sample_count: 0,
+                sample_hashes: [],
+                sample_features: []
+            };
+
+            // Add this sample to features/hashes if not already present
+            if (!existingMetadata.sample_hashes.includes(faceData.hash)) {
+                existingMetadata.sample_count += 1;
+                existingMetadata.sample_hashes.push(faceData.hash);
+                existingMetadata.sample_features.push(faceData.features);
+                existingMetadata.last_updated = new Date().toISOString();
+                existingMetadata.quality = existingMetadata.quality || (faceData.quality > 0.5 ? 'medium' : 'low');
+                
+                this.userMetadata.set(userIdStr, existingMetadata);
+                return true;
+            }
+
+            return false;
+        } catch (error) {
+            
+            return false;
+        }
+    }
+
     async recognizeFace(faceData) {
         try {
-            console.log('🔍 Recognizing face...');
+            
             
             // Process input image
             const processedImage = await this.processImage(faceData);
@@ -1280,26 +1344,29 @@ class PureNodeFaceRecognition {
             let bestMatch = null;
             let bestConfidence = 0;
 
-            // Compare against all users
+            // Compare against all users in metadata
             for (const [userId, userMetadata] of this.userMetadata) {
-                const storedHashes = userMetadata.sample_hashes || [];
+                const storedFeatures = userMetadata.sample_features || [];
                 
                 let maxSimilarity = 0;
-                for (const storedHash of storedHashes) {
-                    const similarity = this.calculateHashSimilarity(inputFaceData.hash, storedHash);
+                for (const features of storedFeatures) {
+                    const similarity = this.calculateFeatureSimilarity(inputFaceData.features, features);
                     maxSimilarity = Math.max(maxSimilarity, similarity);
                 }
 
-                const confidence = maxSimilarity * 100 + (inputFaceData.quality * 10);
+                // Calculate confidence (similar to verifyFace logic)
+                const baseConfidence = maxSimilarity * 100;
+                const qualityBonus = inputFaceData.quality * 10;
+                const confidence = Math.min(98, baseConfidence + qualityBonus);
                 
-                if (confidence > bestConfidence && confidence >= this.minConfidence) {
+                if (confidence > bestConfidence && confidence >= 45) { // Use 45% as minimum threshold for recognition
                     bestConfidence = confidence;
                     bestMatch = userId;
                 }
             }
 
             if (bestMatch) {
-                console.log(`✅ Face recognized: User ${bestMatch} (${bestConfidence.toFixed(1)}%)`);
+                
                 return {
                     success: true,
                     userId: bestMatch,
@@ -1311,12 +1378,12 @@ class PureNodeFaceRecognition {
                     success: false,
                     userId: null,
                     confidence: 0,
-                    message: 'Face not recognized'
+                    message: 'Face not recognized in dataset'
                 };
             }
 
         } catch (error) {
-            console.error('❌ Error recognizing face:', error.message);
+            
             return {
                 success: false,
                 userId: null,
@@ -1332,7 +1399,7 @@ class PureNodeFaceRecognition {
             const metadata = this.userMetadata.get(userIdStr);
             return metadata ? metadata.sample_count : 0;
         } catch (error) {
-            console.error('❌ Error getting user samples:', error.message);
+            
             return 0;
         }
     }
@@ -1343,14 +1410,14 @@ class PureNodeFaceRecognition {
             const metadata = this.userMetadata.get(userIdStr);
             return metadata ? { ...metadata } : null;
         } catch (error) {
-            console.error('❌ Error getting user metadata:', error.message);
+            
             return null;
         }
     }
 
     async removeUserData(userId) {
         try {
-            console.log(`🗑️  Removing face data for user: ${userId}`);
+            
             
             const userIdStr = String(userId);
             const internalId = this.getUserId(userIdStr);
@@ -1369,7 +1436,7 @@ class PureNodeFaceRecognition {
             for (const file of userFiles) {
                 const filePath = path.join(this.datasetPath, file);
                 fs.unlinkSync(filePath);
-                console.log(`🗑️  Removed file: ${file}`);
+                
             }
 
             // Remove from metadata
@@ -1390,12 +1457,12 @@ class PureNodeFaceRecognition {
                         faceSampleCount: ""
                     }
                 });
-                console.log('💾 Database updated successfully');
+                
             } catch (dbError) {
-                console.warn('⚠️  Database update failed:', dbError.message);
+                
             }
 
-            console.log(`✅ Face data removed for user ${userId}`);
+            
             
             return {
                 success: true,
@@ -1404,7 +1471,7 @@ class PureNodeFaceRecognition {
             };
 
         } catch (error) {
-            console.error('❌ Error removing user data:', error.message);
+            
             return {
                 success: false,
                 message: `Error removing user data: ${error.message}`
@@ -1441,7 +1508,7 @@ class PureNodeFaceRecognition {
             };
 
         } catch (error) {
-            console.error('❌ Error getting system stats:', error.message);
+            
             return {
                 success: false,
                 message: `Error getting system stats: ${error.message}`

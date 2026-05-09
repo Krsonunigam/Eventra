@@ -44,7 +44,7 @@ const ImageCapture = ({ isOpen, onComplete, onClose, user }) => {
         setIsStreaming(true);
       }
     } catch (error) {
-      console.error('Error accessing camera:', error);
+      
       toast.error('Camera access denied. Please allow camera access to continue.');
     }
   };
@@ -104,7 +104,7 @@ const ImageCapture = ({ isOpen, onComplete, onClose, user }) => {
         toast.success(`Image ${newImages.length}/${requiredImages} captured successfully!`);
       }
     } catch (error) {
-      console.error('Image capture error:', error);
+      
       toast.error('Image capture failed. Please try again.');
     } finally {
       setIsProcessing(false);

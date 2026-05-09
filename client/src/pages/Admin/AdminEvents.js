@@ -45,7 +45,7 @@ const AdminEvents = () => {
       setEvents(response.data.events);
       setTotalPages(response.data.pagination.pages);
     } catch (error) {
-      console.error('Error fetching events:', error);
+      
       toast.error('Failed to fetch events');
     } finally {
       setLoading(false);
@@ -60,7 +60,7 @@ const AdminEvents = () => {
       toast.success('Event deleted successfully');
       fetchEvents();
     } catch (error) {
-      console.error('Error deleting event:', error);
+      
       toast.error('Failed to delete event');
     }
   };
@@ -71,7 +71,7 @@ const AdminEvents = () => {
       toast.success(`Event ${newStatus} successfully`);
       fetchEvents();
     } catch (error) {
-      console.error('Error updating event status:', error);
+      
       toast.error('Failed to update event status');
     }
   };

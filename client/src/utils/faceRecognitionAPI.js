@@ -36,7 +36,7 @@ class FaceRecognitionAPI {
 
       return response.data;
     } catch (error) {
-      console.error('Face Recognition API Error:', error);
+      
       throw error;
     }
   }
@@ -58,6 +58,11 @@ class FaceRecognitionAPI {
   async verifyFace(imageData, userId = null) {
     const data = { faceData: imageData };
     return this.makeRequest('/verify', 'POST', data);
+  }
+
+  async recognizeFace(imageData) {
+    const data = { faceData: imageData };
+    return this.makeRequest('/recognize', 'POST', data);
   }
 
   async clearFaceData(userId) {

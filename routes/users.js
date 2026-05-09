@@ -35,7 +35,7 @@ router.get('/profile', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get user profile error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch user profile', error: error.message });
   }
 });
@@ -74,7 +74,7 @@ router.put('/profile', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Update user profile error:', error);
+    
     res.status(500).json({ message: 'Failed to update profile', error: error.message });
   }
 });
@@ -108,7 +108,7 @@ router.get('/bookings', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get user bookings error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch bookings', error: error.message });
   }
 });
@@ -138,7 +138,7 @@ router.get('/attendance', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get user attendance error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch attendance history', error: error.message });
   }
 });
@@ -155,7 +155,7 @@ router.get('/stats', auth, async (req, res) => {
       totalSpent
     ] = await Promise.all([
       Booking.countDocuments({ user: req.user.userId }),
-      Booking.countDocuments({ user: req.user.userId, status: 'active' }),
+      Booking.countDocuments({ user: req.user.userId, status: 'confirmed' }),
       Booking.countDocuments({ user: req.user.userId, status: 'completed' }),
       Booking.countDocuments({ user: req.user.userId, status: 'cancelled' }),
       Attendance.countDocuments({ user: req.user.userId, status: 'present' }),
@@ -183,7 +183,7 @@ router.get('/stats', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get user stats error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch user statistics', error: error.message });
   }
 });
@@ -195,7 +195,7 @@ router.get('/favorites', auth, async (req, res) => {
     
     // Get booking statistics by category
     const categoryStats = await Booking.aggregate([
-      { $match: { user: req.user.userId, status: { $in: ['active', 'completed'] } } },
+      { $match: { user: req.user.userId, status: { $in: ['confirmed', 'pending'] } } },
       { $lookup: { from: 'events', localField: 'event', foreignField: '_id', as: 'event' } },
       { $unwind: '$event' },
       { $group: { _id: '$event.category', count: { $sum: 1 } } },
@@ -209,7 +209,7 @@ router.get('/favorites', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get user favorites error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch user favorites', error: error.message });
   }
 });
@@ -242,7 +242,7 @@ router.put('/interests', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Update user interests error:', error);
+    
     res.status(500).json({ message: 'Failed to update interests', error: error.message });
   }
 });
@@ -267,7 +267,7 @@ router.delete('/account', auth, async (req, res) => {
     // Check for active bookings
     const activeBookings = await Booking.countDocuments({
       user: req.user.userId,
-      status: { $in: ['active', 'completed'] }
+      status: { $in: ['confirmed', 'pending'] }
     });
     
     if (activeBookings > 0) {
@@ -283,7 +283,7 @@ router.delete('/account', auth, async (req, res) => {
     res.json({ message: 'Account deactivated successfully' });
     
   } catch (error) {
-    console.error('Delete user account error:', error);
+    
     res.status(500).json({ message: 'Failed to delete account', error: error.message });
   }
 });

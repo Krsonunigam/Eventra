@@ -44,7 +44,7 @@ const Home = () => {
       const response = await api.get('/api/events/upcoming/events');
       setUpcomingEvents(response.data.events);
     } catch (error) {
-      console.error('Error fetching upcoming events:', error);
+      
     } finally {
       setLoading(false);
     }
@@ -108,19 +108,25 @@ const Home = () => {
   const testimonials = [
     {
       name: 'Kumar Sonu Nigam',
-      role: 'Event Organizer',
+      role: 'Admin',
       content: 'Eventra has revolutionized how we manage our events. The face recognition feature is incredible!',
       rating: 5
     },
     {
-      name: 'Aryan Yadav',
-      role: 'Admin',
+      name: 'Mukesh Singh Chauhan',
+      role: 'Manager',
       content: 'The analytics and reporting features give us insights we never had before. Highly recommended!',
       rating: 5
     },
     {
       name: 'Mahesh Pandit',
-      role: 'Student',
+      role: 'Event Organizer',
+      content: 'Booking events has never been easier. The interface is intuitive and the check-in process is seamless.',
+      rating: 5
+    },
+    {
+      name: 'Md.  Anas Khan',
+      role: 'Event Coordinator',
       content: 'Booking events has never been easier. The interface is intuitive and the check-in process is seamless.',
       rating: 5
     }
@@ -140,9 +146,12 @@ const Home = () => {
               transition={{ duration: 0.8 }}
               className="text-4xl md:text-6xl font-bold text-white mb-6"
             >
-              Face Recognition
+              Face the crowd, not the wait!
+
+
               <span className="block bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-                Event Management
+                {/* Event Management */}
+                Welcome to instant event access.
               </span>
             </motion.h1>
             

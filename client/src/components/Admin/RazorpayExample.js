@@ -40,7 +40,7 @@ const RazorpayExample = () => {
 
       // 5. Define error handler
       const onError = (error) => {
-        console.error('Payment error:', error);
+        
         toast.error('Payment failed');
       };
 
@@ -48,7 +48,7 @@ const RazorpayExample = () => {
       openRazorpayModal(options, onSuccess, onError);
 
     } catch (error) {
-      console.error('Error:', error);
+      
       toast.error('Failed to initiate payment');
     } finally {
       setLoading(false);

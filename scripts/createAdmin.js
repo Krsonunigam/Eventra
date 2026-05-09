@@ -11,7 +11,7 @@ const createAdminUser = async () => {
       useUnifiedTopology: true,
     });
 
-    console.log('Connected to MongoDB');
+    
 
     // Check if admin already exists
     const existingAdmin = await User.findOne({ 
@@ -22,7 +22,7 @@ const createAdminUser = async () => {
     });
 
     if (existingAdmin) {
-      console.log('Admin user already exists');
+      
       return;
     }
 
@@ -44,16 +44,16 @@ const createAdminUser = async () => {
     });
 
     await adminUser.save();
-    console.log('Admin user created successfully!');
-    console.log('Email: adminyadav@eventra.com');
-    console.log('Password: raosahab0001');
-    console.log('Role: admin');
+    
+    
+    
+    
 
   } catch (error) {
-    console.error('Error creating admin user:', error);
+    
   } finally {
     await mongoose.disconnect();
-    console.log('Disconnected from MongoDB');
+    
   }
 };
 

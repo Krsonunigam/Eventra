@@ -37,12 +37,12 @@ const FaceCapture = ({ onCapture, onClose, isOpen, title = "Capture Your Face" }
         
         // Wait for video to be ready
         videoRef.current.onloadedmetadata = () => {
-          console.log('Video loaded:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
+          
         };
       }
     } catch (err) {
       setError('Camera access denied. Please allow camera access to continue.');
-      console.error('Camera error:', err);
+      
     }
   };
 

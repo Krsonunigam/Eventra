@@ -17,11 +17,11 @@ const initializeRazorpay = () => {
         key_id: process.env.RAZORPAY_KEY_ID,
         key_secret: process.env.RAZORPAY_KEY_SECRET
       });
-      console.log('Razorpay initialized with environment variables');
+      
     } else {
-      console.warn('Razorpay environment variables not set. Payment features will be disabled.');
-      console.warn('RAZORPAY_KEY_ID:', process.env.RAZORPAY_KEY_ID ? 'Set' : 'Missing');
-      console.warn('RAZORPAY_KEY_SECRET:', process.env.RAZORPAY_KEY_SECRET ? 'Set' : 'Missing');
+      
+      
+      
     }
   }
   return razorpay;
@@ -125,18 +125,14 @@ router.post('/order', auth, async (req, res) => {
       });
     }
 
-    console.log('Creating Razorpay order with options:', {
-      amount: options.amount,
-      currency: options.currency,
-      receipt: options.receipt
-    });
+    
 
     let order;
     try {
       order = await rzp.orders.create(options);
-      console.log('Razorpay order created successfully:', order.id);
+      
     } catch (razorpayError) {
-      console.error('Razorpay order creation failed:', razorpayError);
+      
       return res.status(500).json({
         message: 'Failed to create payment order',
         error: razorpayError.message,
@@ -182,15 +178,10 @@ router.post('/order', auth, async (req, res) => {
         });
       }
       await subscription.save();
-      console.log('Subscription record created/updated successfully');
+      
     } catch (dbError) {
-      console.error('Database error creating subscription:', dbError);
-      console.error('Error details:', {
-        name: dbError.name,
-        message: dbError.message,
-        code: dbError.code,
-        errors: dbError.errors
-      });
+      
+      
       return res.status(500).json({
         message: 'Failed to create subscription record',
         error: dbError.message,
@@ -206,13 +197,8 @@ router.post('/order', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error creating Razorpay order for admin subscription:', error);
-    console.error('Error details:', {
-      message: error.message,
-      statusCode: error.statusCode,
-      error: error.error,
-      stack: error.stack
-    });
+    
+    
     res.status(500).json({ 
       message: 'Failed to create order', 
       error: error.message,
@@ -267,7 +253,7 @@ router.post('/verify', auth, async (req, res) => {
     res.json({ message: 'Payment successful and subscription activated', subscription });
 
   } catch (error) {
-    console.error('Error verifying Razorpay payment for admin subscription:', error);
+    
     res.status(500).json({ message: 'Payment verification failed', error: error.message });
   }
 });
@@ -312,7 +298,7 @@ router.get('/dashboard-status', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get subscription dashboard status error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to get subscription status',
       error: error.message,
@@ -363,7 +349,7 @@ router.get('/status', auth, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get subscription status error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to get subscription status',
       error: error.message,
@@ -526,7 +512,7 @@ router.post('/create-payment', auth, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Create payment order error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to create payment order',
       error: error.message,
@@ -594,7 +580,7 @@ router.post('/verify-payment', auth, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Verify payment error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to verify payment',
       error: error.message,
@@ -628,7 +614,7 @@ router.post('/cancel', auth, async (req, res) => {
     if (admin.role === 'admin' || admin.role === 'premium_admin') {
       admin.role = 'user';
       await admin.save();
-      console.log('User role changed from admin to user after subscription cancellation');
+      
     }
 
     res.json({
@@ -637,7 +623,7 @@ router.post('/cancel', auth, async (req, res) => {
       cancellationDate: subscription.cancellationDate
     });
   } catch (error) {
-    console.error('Cancel subscription error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to cancel subscription',
       error: error.message,
@@ -715,7 +701,7 @@ router.get('/analytics', auth, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get subscription analytics error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to get subscription analytics',
       error: error.message,
@@ -728,14 +714,14 @@ router.get('/analytics', auth, async (req, res) => {
 router.post('/reactivate', auth, async (req, res) => {
   try {
     const adminId = req.user.userId;
-    console.log('Reactivate request for admin:', adminId);
+    
 
     const subscription = await AdminSubscription.findOne({ 
       admin: adminId,
       status: 'cancelled'
     });
 
-    console.log('Found subscription:', subscription ? 'Yes' : 'No');
+    
 
     if (!subscription) {
       return res.status(404).json({
@@ -750,9 +736,9 @@ router.post('/reactivate', auth, async (req, res) => {
       subscription.cancellationDate = null;
       subscription.autoRenew = true;
       await subscription.save();
-      console.log('Subscription reactivated successfully');
+      
     } catch (saveError) {
-      console.error('Error saving subscription:', saveError);
+      
       return res.status(500).json({
         message: 'Failed to save subscription changes',
         error: saveError.message,
@@ -766,10 +752,10 @@ router.post('/reactivate', auth, async (req, res) => {
       if (admin && admin.role === 'user') {
         admin.role = 'admin';
         await admin.save();
-        console.log('User role changed from user to admin after subscription reactivation');
+        
       }
     } catch (userError) {
-      console.error('Error updating user role:', userError);
+      
       // Don't fail the request if user update fails
     }
 
@@ -784,13 +770,8 @@ router.post('/reactivate', auth, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Reactivate subscription error:', error);
-    console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      code: error.code,
-      errors: error.errors
-    });
+    
+    
     res.status(500).json({ 
       message: 'Failed to reactivate subscription',
       error: error.message,
@@ -806,7 +787,7 @@ router.post('/renewal', auth, async (req, res) => {
     const { plan } = req.body;
     const adminId = req.user.userId;
 
-    console.log('Renewal request for admin:', adminId, 'plan:', plan);
+    
 
     // Validate plan
     const validPlans = ['basic', 'professional', 'enterprise'];
@@ -827,12 +808,12 @@ router.post('/renewal', auth, async (req, res) => {
     // Initialize Razorpay
     const razorpay = initializeRazorpay();
     if (!razorpay) {
-      console.error('Razorpay not initialized for renewal. Check environment variables.');
-      console.error('RAZORPAY_KEY_ID:', process.env.RAZORPAY_KEY_ID ? 'Set' : 'Missing');
-      console.error('RAZORPAY_KEY_SECRET:', process.env.RAZORPAY_KEY_SECRET ? 'Set' : 'Missing');
+      
+      
+      
       
       // Mock mode for development
-      console.log('Using mock mode for renewal order creation');
+      
       const mockOrderId = `mock_renewal_${adminId}_${Date.now()}`;
       const amount = planAmounts[plan] || 99900;
       
@@ -866,9 +847,9 @@ router.post('/renewal', auth, async (req, res) => {
     };
 
     try {
-      console.log('Creating Razorpay order with options:', orderOptions);
+      
       const order = await razorpay.orders.create(orderOptions);
-      console.log('Renewal order created successfully:', order.id);
+      
 
       res.json({
         success: true,
@@ -878,13 +859,8 @@ router.post('/renewal', auth, async (req, res) => {
         message: 'Renewal order created successfully'
       });
     } catch (razorpayError) {
-      console.error('Razorpay order creation error:', razorpayError);
-      console.error('Error details:', {
-        name: razorpayError.name,
-        message: razorpayError.message,
-        code: razorpayError.code,
-        statusCode: razorpayError.statusCode
-      });
+      
+      
       res.status(500).json({
         message: 'Failed to create renewal order',
         error: razorpayError.message,
@@ -893,7 +869,7 @@ router.post('/renewal', auth, async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Renewal order error:', error);
+    
     res.status(500).json({
       message: 'Failed to create renewal order',
       error: error.message,
@@ -908,7 +884,7 @@ router.post('/verify-renewal', auth, async (req, res) => {
     const { orderId, paymentId, signature } = req.body;
     const adminId = req.user.userId;
 
-    console.log('Renewal verification for admin:', adminId);
+    
 
     // Initialize Razorpay
     const razorpay = initializeRazorpay();
@@ -921,7 +897,7 @@ router.post('/verify-renewal', auth, async (req, res) => {
 
     // Handle mock payments (development mode)
     if (orderId.startsWith('mock_') && paymentId.startsWith('mock_payment_') && signature === 'mock_signature') {
-      console.log('Mock payment verification for renewal');
+      
       
       // Get plan from existing subscription
       const existingSubscription = await AdminSubscription.findOne({
@@ -956,7 +932,7 @@ router.post('/verify-renewal', auth, async (req, res) => {
 
       await existingSubscription.save();
 
-      console.log('Mock subscription renewed successfully for admin:', adminId);
+      
 
       return res.json({
         success: true,
@@ -1020,7 +996,7 @@ router.post('/verify-renewal', auth, async (req, res) => {
 
     await existingSubscription.save();
 
-    console.log('Subscription renewed successfully for admin:', adminId);
+    
 
     res.json({
       success: true,
@@ -1034,7 +1010,7 @@ router.post('/verify-renewal', auth, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Renewal verification error:', error);
+    
     res.status(500).json({
       message: 'Failed to verify renewal payment',
       error: error.message,

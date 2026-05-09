@@ -22,10 +22,11 @@ import api from '../../utils/axiosConfig';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { loadRazorpayScript, createRazorpayOptions, openRazorpayModal } from '../../utils/razorpay';
+import ConfirmationModal from '../Modal/ConfirmationModal';
 
 const AdminSubscription = () => {
   const toast = useCustomToast();
-  const { isAdmin, isAuthenticated, user } = useAuth();
+  const { isAdmin, isAuthenticated, user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [subscription, setSubscription] = useState(null);
@@ -33,6 +34,7 @@ const AdminSubscription = () => {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('professional');
   const [renewalLoading, setRenewalLoading] = useState(false);
+  const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   useEffect(() => {
     // Check for plan parameter in URL
@@ -61,7 +63,7 @@ const AdminSubscription = () => {
         setSubscription(response.data.subscription || response.data);
       }
     } catch (error) {
-      console.error('Error fetching subscription status:', error);
+      
       if (error.response?.status === 401) {
         toast.error('Please login to access subscription features');
       } else if (error.response?.status === 404) {
@@ -97,22 +99,23 @@ const AdminSubscription = () => {
             razorpay_signature: response.razorpay_signature,
           });
           toast.success('Subscription activated successfully!');
-          fetchSubscriptionStatus(); // Refresh status
+          await fetchSubscriptionStatus(); // Refresh status
+          await refreshUser(); // Update isAdmin status globally
         } catch (verifyError) {
-          console.error('Payment verification failed:', verifyError);
+          
           toast.error('Payment verification failed. Please contact support.');
         }
       };
 
       const onError = (error) => {
-        console.error('Payment error:', error);
+        
         toast.error('Payment failed. Please try again.');
       };
 
       openRazorpayModal(options, onSuccess, onError);
 
     } catch (error) {
-      console.error('Error initiating payment:', error);
+      
       toast.error(error.response?.data?.message || 'Failed to initiate payment.');
       setPaymentLoading(false);
     }
@@ -140,21 +143,22 @@ const AdminSubscription = () => {
             razorpay_signature: response.razorpay_signature,
           });
           toast.success('Payment successful! Subscription activated.');
-          fetchSubscriptionStatus();
+          await fetchSubscriptionStatus();
+          await refreshUser(); // Update isAdmin status globally
         } catch (verifyError) {
-          console.error('Payment verification failed:', verifyError);
+          
           toast.error('Payment verification failed. Please contact support.');
         }
       };
 
       const onError = (error) => {
-        console.error('Payment error:', error);
+        
         toast.error('Payment failed. Please try again.');
       };
 
       openRazorpayModal(options, onSuccess, onError);
     } catch (error) {
-      console.error('Error creating payment:', error);
+      
       toast.error(error.response?.data?.message || 'Failed to create payment');
       setPaymentLoading(false);
     }
@@ -166,51 +170,59 @@ const AdminSubscription = () => {
       if (response.data.success) {
         toast.success('Payment successful! Subscription activated.');
         setSubscription(response.data.subscription);
+        await refreshUser(); // Update isAdmin status globally
       }
     } catch (error) {
-      console.error('Error verifying payment:', error);
+      
       toast.error('Payment verification failed');
     }
   };
 
   const handleCancelSubscription = async () => {
-    if (!window.confirm('Are you sure you want to cancel your subscription?')) {
-      return;
-    }
-
-    try {
-      const response = await api.post('/api/admin/subscription/cancel', {
-        reason: 'User requested cancellation'
-      });
-      
-      if (response.data.success) {
-        toast.success('Subscription cancelled successfully');
-        // Refresh the page after successful cancellation
-        window.location.reload();
+    setModalConfig({
+      isOpen: true,
+      title: 'Cancel Subscription',
+      message: 'Are you sure you want to cancel? You will lose access to premium features after your current billing period ends.',
+      confirmText: 'Yes, Cancel',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const response = await api.post('/api/admin/subscription/cancel', {
+            reason: 'User requested cancellation'
+          });
+          
+          if (response.data.success) {
+            toast.success('Subscription cancelled successfully');
+            window.location.reload();
+          }
+        } catch (error) {
+          
+          toast.error('Failed to cancel subscription');
+        }
       }
-    } catch (error) {
-      console.error('Error cancelling subscription:', error);
-      toast.error('Failed to cancel subscription');
-    }
+    });
   };
 
   const handleReactivateSubscription = async () => {
-    if (!window.confirm('Are you sure you want to reactivate your subscription?')) {
-      return;
-    }
-
-    try {
-      const response = await api.post('/api/admin/subscription/reactivate');
-      
-      if (response.data.success) {
-        toast.success('Subscription reactivated successfully');
-        // Refresh the page after successful reactivation
-        window.location.reload();
+    setModalConfig({
+      isOpen: true,
+      title: 'Reactivate Subscription',
+      message: 'Are you sure you want to reactivate your subscription?',
+      confirmText: 'Reactivate',
+      type: 'info',
+      onConfirm: async () => {
+        try {
+          const response = await api.post('/api/admin/subscription/reactivate');
+          if (response.data.success) {
+            toast.success('Subscription reactivated successfully');
+            window.location.reload();
+          }
+        } catch (error) {
+          
+          toast.error('Failed to reactivate subscription');
+        }
       }
-    } catch (error) {
-      console.error('Error reactivating subscription:', error);
-      toast.error('Failed to reactivate subscription');
-    }
+    });
   };
 
   const handleRenewalPayment = async () => {
@@ -227,7 +239,7 @@ const AdminSubscription = () => {
         
         // Check if it's a mock order (development mode)
         if (orderId.startsWith('mock_')) {
-          console.log('Mock renewal order detected, simulating successful payment...');
+          
           
           // Simulate successful payment for mock orders
           setTimeout(async () => {
@@ -241,12 +253,13 @@ const AdminSubscription = () => {
               
               if (verifyResponse.data.success) {
                 toast.success('Subscription renewed successfully! (Mock payment)');
+                await refreshUser();
                 window.location.reload();
               } else {
                 toast.error('Mock payment verification failed');
               }
             } catch (error) {
-              console.error('Mock payment verification error:', error);
+              
               toast.error('Mock payment verification failed');
             }
           }, 2000); // 2 second delay to simulate payment processing
@@ -286,18 +299,19 @@ const AdminSubscription = () => {
             
             if (verifyResponse.data.success) {
               toast.success('Subscription renewed successfully!');
+              await refreshUser();
               window.location.reload();
             } else {
               toast.error('Payment verification failed');
             }
           } catch (error) {
-            console.error('Payment verification error:', error);
+            
             toast.error('Payment verification failed');
           }
         });
         
         razorpay.on('payment.failed', (response) => {
-          console.error('Payment failed:', response.error);
+          
           toast.error('Payment failed. Please try again.');
         });
         
@@ -306,7 +320,7 @@ const AdminSubscription = () => {
         toast.error(response.data.message || 'Failed to create renewal order');
       }
     } catch (error) {
-      console.error('Renewal payment error:', error);
+      
       toast.error('Error processing renewal payment');
     } finally {
       setRenewalLoading(false);
@@ -911,6 +925,16 @@ const AdminSubscription = () => {
           ))}
         </div>
       </motion.div>
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={modalConfig.isOpen}
+        onClose={() => setModalConfig({ ...modalConfig, isOpen: false })}
+        onConfirm={modalConfig.onConfirm}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        confirmText={modalConfig.confirmText}
+        type={modalConfig.type}
+      />
     </div>
   );
 };

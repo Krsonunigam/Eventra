@@ -15,7 +15,7 @@ class FaceRecognitionApp {
 
     async initializeApp() {
         try {
-            console.log('Initializing Face Recognition System...');
+            
             
             // Get DOM elements
             this.video = document.getElementById('video');
@@ -35,10 +35,10 @@ class FaceRecognitionApp {
             this.updateStatus();
             
             this.isInitialized = true;
-            console.log('Face Recognition System initialized successfully');
+            
             
         } catch (error) {
-            console.error('Failed to initialize app:', error);
+            
             this.showError('Failed to initialize system: ' + error.message);
         }
     }

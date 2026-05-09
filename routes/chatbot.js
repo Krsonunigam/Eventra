@@ -29,7 +29,7 @@ const getChatbotResponse = async (message, userInterests = [], userId = null) =>
           response += `\n\nHere's your current information:\n${liveData}`;
         }
       } catch (error) {
-        console.error('Error fetching live data:', error);
+        
         // Continue with static response if API fails
       }
     }
@@ -152,7 +152,7 @@ const fetchLiveData = async (endpoint, userId) => {
         return null;
     }
   } catch (error) {
-    console.error('Error fetching live data:', error);
+    
     return null;
   }
 };
@@ -182,7 +182,7 @@ const getUserStats = async (userId) => {
       attendanceRate
     };
   } catch (error) {
-    console.error('Error getting user stats:', error);
+    
     return { totalBookings: 0, confirmedBookings: 0, totalSpent: 0, attendanceRate: 0 };
   }
 };
@@ -212,7 +212,7 @@ router.post('/chat', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Chatbot error:', error);
+    
     res.status(500).json({ 
       message: 'Sorry, I encountered an error. Please try again.',
       error: error.message 
@@ -231,7 +231,7 @@ router.get('/suggestions', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get suggestions error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to get suggestions',
       error: error.message 
@@ -252,7 +252,7 @@ router.get('/questions/:category', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get questions by category error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to get questions',
       error: error.message 
@@ -278,7 +278,7 @@ router.get('/search', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Search questions error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to search questions',
       error: error.message 
@@ -307,7 +307,7 @@ router.get('/categories', auth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get categories error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to get categories',
       error: error.message 
@@ -341,7 +341,7 @@ router.get('/faq', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Get FAQ error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to get FAQ',
       error: error.message 

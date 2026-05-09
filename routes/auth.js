@@ -37,7 +37,9 @@ router.post('/register', async (req, res) => {
       institute,
       dateOfBirth: dob,
       phoneNumber,
-      interests: interests || []
+      interests: interests || [],
+      faceDataCollected: false,
+      isFaceVerified: false
     });
 
     await user.save();
@@ -65,7 +67,7 @@ router.post('/register', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Registration error:', error);
+    
     res.status(500).json({ message: 'Registration failed', error: error.message });
   }
 });
@@ -98,25 +100,32 @@ router.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    res.json({
-      message: 'Login successful',
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        studentId: user.studentId,
-        institute: user.institute,
-        dateOfBirth: user.dateOfBirth,
-        phoneNumber: user.phoneNumber,
-        interests: user.interests,
-        isActive: user.isActive,
-        emailVerified: user.emailVerified
-      }
-    });
+   res.json({
+  message: 'Login successful',
+  token,
+  user: {
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    studentId: user.studentId,
+    institute: user.institute,
+    dateOfBirth: user.dateOfBirth,
+    phoneNumber: user.phoneNumber,
+    interests: user.interests,
+    isActive: user.isActive,
+    emailVerified: user.emailVerified,
+
+    // 🔥🔥🔥 MAIN FIX (ADD THIS)
+    faceDataCollected: user.faceDataCollected || false,
+    faceTrainingCompleted: user.faceTrainingCompleted || false,
+    faceSampleCount: user.faceSampleCount || 0,
+    isFaceVerified: user.isFaceVerified || false,
+    faceTrainingDate: user.faceTrainingDate || null
+  }
+});
 
   } catch (error) {
-    console.error('Login error:', error);
+    
     res.status(500).json({ message: 'Login failed', error: error.message });
   }
 });
@@ -129,6 +138,20 @@ router.get('/profile', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    const hasEnoughFaceSamples = (user.faceSampleCount || 0) >= 10;
+    const hasTrainingArtifacts = Boolean(user.faceTrainingDate) && hasEnoughFaceSamples;
+    const normalizedFaceDataCollected = user.faceDataCollected || hasTrainingArtifacts;
+    const normalizedFaceTrainingCompleted = user.faceTrainingCompleted || hasTrainingArtifacts;
+
+    if (
+      normalizedFaceDataCollected !== user.faceDataCollected ||
+      normalizedFaceTrainingCompleted !== user.faceTrainingCompleted
+    ) {
+      user.faceDataCollected = normalizedFaceDataCollected;
+      user.faceTrainingCompleted = normalizedFaceTrainingCompleted;
+      await user.save();
+    }
+
     res.json({
       user: {
         id: user._id,
@@ -138,7 +161,13 @@ router.get('/profile', auth, async (req, res) => {
         institute: user.institute,
         dateOfBirth: user.dateOfBirth,
         phoneNumber: user.phoneNumber,
+        phone: user.phone,
         interests: user.interests,
+        gender: user.gender,
+        bio: user.bio,
+        socialLinks: user.socialLinks,
+        notificationPreferences: user.notificationPreferences,
+        privacySettings: user.privacySettings,
         isActive: user.isActive,
         emailVerified: user.emailVerified,
         faceDataCollected: user.faceDataCollected || false,
@@ -147,12 +176,13 @@ router.get('/profile', auth, async (req, res) => {
         faceTrainingDate: user.faceTrainingDate,
         faceVerificationDate: user.faceVerificationDate,
         faceVerificationConfidence: user.faceVerificationConfidence,
-        faceDataQuality: user.faceDataQuality
+        faceDataQuality: user.faceDataQuality,
+        profilePicture: user.profilePicture
       }
     });
 
   } catch (error) {
-    console.error('Get profile error:', error);
+    
     res.status(500).json({ message: 'Failed to get profile', error: error.message });
   }
 });
@@ -160,39 +190,64 @@ router.get('/profile', auth, async (req, res) => {
 // Update user profile
 router.put('/profile', auth, async (req, res) => {
   try {
-    const { name, studentId, institute, phoneNumber, interests } = req.body;
-    const user = await User.findById(req.user.userId);
+    
+    const { 
+      name, studentId, institute, phoneNumber, interests, profilePicture, 
+      phone, dateOfBirth, gender, bio, socialLinks, notificationPreferences, privacySettings 
+    } = req.body;
+    
+    // Find and update user
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.userId,
+      { 
+        $set: {
+          ...(name && { name }),
+          ...(studentId && { studentId }),
+          ...(institute && { institute }),
+          ...(phoneNumber && { phoneNumber }),
+          ...(phone && { phone }),
+          ...(interests && { interests }),
+          ...(profilePicture && { profilePicture }),
+          ...(dateOfBirth && { dateOfBirth: new Date(dateOfBirth) }),
+          ...(gender && { gender }),
+          ...(bio !== undefined && { bio }),
+          ...(socialLinks && { socialLinks }),
+          ...(notificationPreferences && { notificationPreferences }),
+          ...(privacySettings && { privacySettings })
+        }
+      },
+      { new: true, runValidators: true }
+    );
 
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Update user fields
-    if (name) user.name = name;
-    if (studentId) user.studentId = studentId;
-    if (institute) user.institute = institute;
-    if (phoneNumber) user.phoneNumber = phoneNumber;
-    if (interests) user.interests = interests;
-
-    await user.save();
-
     res.json({
+      success: true,
       message: 'Profile updated successfully',
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        studentId: user.studentId,
-        institute: user.institute,
-        dateOfBirth: user.dateOfBirth,
-        phoneNumber: user.phoneNumber,
-        interests: user.interests
+        id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        studentId: updatedUser.studentId,
+        institute: updatedUser.institute,
+        dateOfBirth: updatedUser.dateOfBirth,
+        phoneNumber: updatedUser.phoneNumber,
+        phone: updatedUser.phone,
+        interests: updatedUser.interests,
+        profilePicture: updatedUser.profilePicture,
+        gender: updatedUser.gender,
+        bio: updatedUser.bio,
+        socialLinks: updatedUser.socialLinks,
+        notificationPreferences: updatedUser.notificationPreferences,
+        privacySettings: updatedUser.privacySettings
       }
     });
 
   } catch (error) {
-    console.error('Update profile error:', error);
-    res.status(500).json({ message: 'Failed to update profile', error: error.message });
+    
+    res.status(400).json({ success: false, message: 'Failed to update profile', error: error.message });
   }
 });
 
@@ -206,12 +261,8 @@ router.post('/verify-face', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    console.log('Face verification request for user:', user.email);
-    console.log('User face data status:', {
-      faceDataCollected: user.faceDataCollected,
-      isFaceVerified: user.isFaceVerified,
-      faceSampleCount: user.faceSampleCount
-    });
+    
+    
 
     // If user doesn't have face data collected yet, this is first-time setup
     if (!user.faceDataCollected) {
@@ -230,7 +281,7 @@ router.post('/verify-face', auth, async (req, res) => {
 
     // Check if face is already verified
     if (user.isFaceVerified) {
-      console.log('Face already verified for user:', user.email);
+      
       return res.status(400).json({ 
         message: 'Face already verified',
         user: {
@@ -245,10 +296,10 @@ router.post('/verify-face', auth, async (req, res) => {
     }
 
     // User has stored face data, verify against it
-    console.log('Verifying face against stored data...');
+    
     const verificationResult = await verifyFace(faceData, req.user.userId);
 
-    console.log('Verification result:', verificationResult);
+    
 
     if (verificationResult.success && verificationResult.isMatch && verificationResult.confidence > 70) {
       // Update user verification status
@@ -257,7 +308,7 @@ router.post('/verify-face', auth, async (req, res) => {
       user.faceVerificationConfidence = verificationResult.confidence;
       await user.save();
 
-      console.log('Face verification successful for user:', user.email);
+      
 
       res.json({ 
         message: 'Face verification successful',
@@ -274,7 +325,7 @@ router.post('/verify-face', auth, async (req, res) => {
         }
       });
     } else {
-      console.log('Face verification failed for user:', user.email);
+      
       res.status(400).json({ 
         message: 'Face verification failed',
         confidence: verificationResult.confidence || 0,
@@ -283,7 +334,7 @@ router.post('/verify-face', auth, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Face verification error:', error);
+    
     res.status(500).json({ 
       message: 'Face verification failed', 
       error: error.message 
@@ -311,7 +362,7 @@ router.post('/update-face', auth, async (req, res) => {
     // Limit the number of samples to prevent memory issues
     const limitedSamples = faceSamples.slice(0, 25);
     if (limitedSamples.length < faceSamples.length) {
-      console.log(`Limited face samples from ${faceSamples.length} to ${limitedSamples.length}`);
+      
     }
 
     // Store face data in MongoDB
@@ -335,7 +386,7 @@ router.post('/update-face', auth, async (req, res) => {
         return res.status(404).json({ message: 'User not found' });
       }
 
-      console.log(`Face model training completed for user ${updatedUser.email}`);
+      
 
       return res.json({
         message: 'Face samples collected and recognizer trained successfully',
@@ -350,13 +401,13 @@ router.post('/update-face', auth, async (req, res) => {
         }
       });
     } catch (dbError) {
-      console.error('Database error:', dbError);
+      
       return res.status(500).json({ 
         message: 'Failed to save face data to database' 
       });
     }
   } catch (error) {
-    console.error('Update face error:', error);
+    
     res.status(500).json({ message: 'Failed to update face data', error: error.message });
   }
 });
@@ -395,7 +446,7 @@ router.post('/update-face-data', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update face data error:', error);
+    
     res.status(500).json({ message: 'Failed to update face data', error: error.message });
   }
 });
@@ -436,7 +487,7 @@ router.post('/train-face-model', auth, async (req, res) => {
         return res.status(404).json({ message: 'User not found' });
       }
 
-      console.log(`Face model training completed for user ${updatedUser.email}`);
+      
 
       return res.json({
         message: 'Face model trained successfully',
@@ -451,13 +502,13 @@ router.post('/train-face-model', auth, async (req, res) => {
         }
       });
     } catch (dbError) {
-      console.error('Database error:', dbError);
+      
       return res.status(500).json({ 
         message: 'Failed to save face data to database' 
       });
     }
   } catch (error) {
-    console.error('Train face model error:', error);
+    
     res.status(500).json({ message: 'Failed to train face model', error: error.message });
   }
 });
@@ -469,6 +520,20 @@ router.get('/face-status', auth, async (req, res) => {
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    const hasEnoughFaceSamples = (user.faceSampleCount || 0) >= 10;
+    const hasTrainingArtifacts = Boolean(user.faceTrainingDate) && hasEnoughFaceSamples;
+    const normalizedFaceDataCollected = user.faceDataCollected || hasTrainingArtifacts;
+    const normalizedFaceTrainingCompleted = user.faceTrainingCompleted || hasTrainingArtifacts;
+
+    if (
+      normalizedFaceDataCollected !== user.faceDataCollected ||
+      normalizedFaceTrainingCompleted !== user.faceTrainingCompleted
+    ) {
+      user.faceDataCollected = normalizedFaceDataCollected;
+      user.faceTrainingCompleted = normalizedFaceTrainingCompleted;
+      await user.save();
     }
 
     res.json({
@@ -487,7 +552,7 @@ router.get('/face-status', auth, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get face status error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to get face status', 
       error: error.message 
@@ -503,6 +568,20 @@ router.get('/me', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    const hasEnoughFaceSamples = (user.faceSampleCount || 0) >= 10;
+    const hasTrainingArtifacts = Boolean(user.faceTrainingDate) && hasEnoughFaceSamples;
+    const normalizedFaceDataCollected = user.faceDataCollected || hasTrainingArtifacts;
+    const normalizedFaceTrainingCompleted = user.faceTrainingCompleted || hasTrainingArtifacts;
+
+    if (
+      normalizedFaceDataCollected !== user.faceDataCollected ||
+      normalizedFaceTrainingCompleted !== user.faceTrainingCompleted
+    ) {
+      user.faceDataCollected = normalizedFaceDataCollected;
+      user.faceTrainingCompleted = normalizedFaceTrainingCompleted;
+      await user.save();
+    }
+
     res.json({
       success: true,
       user: {
@@ -514,9 +593,19 @@ router.get('/me', auth, async (req, res) => {
         emailVerified: user.emailVerified,
         profilePicture: user.profilePicture,
         phone: user.phone,
+        phoneNumber: user.phoneNumber,
+        studentId: user.studentId,
+        institute: user.institute,
+        dateOfBirth: user.dateOfBirth,
+        gender: user.gender,
+        bio: user.bio,
+        socialLinks: user.socialLinks,
+        notificationPreferences: user.notificationPreferences,
+        privacySettings: user.privacySettings,
         address: user.address,
         preferences: user.preferences,
-        faceDataCollected: user.faceDataCollected || false,
+        faceDataCollected: normalizedFaceDataCollected,
+        faceTrainingCompleted: normalizedFaceTrainingCompleted,
         isFaceVerified: user.isFaceVerified || false,
         faceSampleCount: user.faceSampleCount || 0,
         faceTrainingDate: user.faceTrainingDate,
@@ -528,7 +617,7 @@ router.get('/me', auth, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get user info error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to get user info', 
       error: error.message 

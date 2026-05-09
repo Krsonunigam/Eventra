@@ -9,16 +9,17 @@ const {
     getFaceData,
     removeFaceData,
     getTrainingStats,
-    healthCheck
+    healthCheck,
+    pureNodeFaceRecognition
 } = require('../utils/pureNodeFaceRecognition');
 const User = require('../models/User');
 
 // POST /api/pure-face/collect - Collect face samples for training
 router.post('/collect', auth, async (req, res) => {
     try {
-        console.log('📸 Pure Node.js face collect request for user:', req.user.userId);
+        
         const { faceSamples } = req.body;
-        console.log('📊 Face samples count:', faceSamples ? faceSamples.length : 0);
+        
         
         if (!faceSamples || !Array.isArray(faceSamples) || faceSamples.length < 10) {
             return res.status(400).json({ 
@@ -29,17 +30,17 @@ router.post('/collect', auth, async (req, res) => {
         // Limit the number of samples to prevent memory issues
         const limitedSamples = faceSamples.slice(0, 25);
         if (limitedSamples.length < faceSamples.length) {
-            console.log(`⚠️  Limited face samples from ${faceSamples.length} to ${limitedSamples.length}`);
+            
         }
 
         // Use pure Node.js face recognition
         const result = await storeFaceData(req.user.userId, limitedSamples);
         
         if (result.success) {
-            console.log(`✅ Pure Node.js face training completed for user ${req.user.userId}`);
+            
             res.json(result);
         } else {
-            console.log(`❌ Pure Node.js face training failed for user ${req.user.userId}:`, result.message);
+            
             // Return success with training failure details instead of 400 error
             res.json({
                 success: false,
@@ -50,7 +51,7 @@ router.post('/collect', auth, async (req, res) => {
         }
 
     } catch (err) {
-        console.error('❌ Error in pure Node.js face collect:', err);
+        
         res.status(500).json({ 
             message: 'Internal server error', 
             error: err.message 
@@ -87,10 +88,10 @@ router.post('/verify', auth, async (req, res) => {
             user.faceVerificationConfidence = result.confidence;
             await user.save();
             
-            console.log(`✅ Pure Node.js face verification successful for user ${req.user.userId}`);
+            
             res.json(result);
         } else {
-            console.log(`❌ Pure Node.js face verification failed for user ${req.user.userId}:`, result.message);
+            
             // Return success with verification failure details instead of 400 error
             res.json({
                 success: false,
@@ -101,7 +102,7 @@ router.post('/verify', auth, async (req, res) => {
         }
 
     } catch (err) {
-        console.error('❌ Error in pure Node.js face verify:', err);
+        
         res.status(500).json({ 
             message: 'Internal server error', 
             error: err.message 
@@ -127,10 +128,10 @@ router.post('/recognize', auth, async (req, res) => {
         const result = await recognizeFace(faceData);
         
         if (result.success) {
-            console.log(`✅ Pure Node.js face recognition successful: User ${result.userId}`);
+            
             res.json(result);
         } else {
-            console.log(`❌ Pure Node.js face recognition failed:`, result.message);
+            
             // Return success with recognition failure details instead of 400 error
             res.json({
                 success: false,
@@ -141,7 +142,7 @@ router.post('/recognize', auth, async (req, res) => {
         }
 
     } catch (err) {
-        console.error('❌ Error in pure Node.js face recognize:', err);
+        
         res.status(500).json({ 
             message: 'Internal server error', 
             error: err.message 
@@ -187,7 +188,7 @@ router.get('/data', auth, async (req, res) => {
             });
         }
     } catch (err) {
-        console.error('❌ Error getting pure Node.js face data:', err);
+        
         res.status(500).json({ 
             message: 'Internal server error', 
             error: err.message 
@@ -201,10 +202,10 @@ router.delete('/data', auth, async (req, res) => {
         const result = await removeFaceData(req.user.userId);
         
         if (result.success) {
-            console.log(`✅ Pure Node.js face data removed for user ${req.user.userId}`);
+            
             res.json(result);
         } else {
-            console.log(`❌ Pure Node.js face data removal failed for user ${req.user.userId}:`, result.message);
+            
             // Return success with removal failure details instead of 400 error
             res.json({
                 success: false,
@@ -214,7 +215,7 @@ router.delete('/data', auth, async (req, res) => {
         }
 
     } catch (err) {
-        console.error('❌ Error removing pure Node.js face data:', err);
+        
         res.status(500).json({ 
             message: 'Internal server error', 
             error: err.message 
@@ -239,7 +240,7 @@ router.post('/train', auth, async (req, res) => {
         });
 
     } catch (err) {
-        console.error('❌ Error in pure Node.js face train:', err);
+        
         res.status(500).json({ 
             message: 'Internal server error', 
             error: err.message 
@@ -266,7 +267,7 @@ router.get('/stats', async (req, res) => {
         }
 
     } catch (err) {
-        console.error('❌ Error getting pure Node.js face stats:', err);
+        
         res.status(500).json({ 
             message: 'Internal server error', 
             error: err.message 
@@ -280,7 +281,7 @@ router.get('/health', async (req, res) => {
         const result = await healthCheck();
         res.json(result);
     } catch (err) {
-        console.error('❌ Error in pure Node.js face health check:', err);
+        
         res.status(500).json({ 
             success: false,
             message: 'Health check failed', 
@@ -307,11 +308,33 @@ router.get('/samples/:userId', auth, async (req, res) => {
         });
 
     } catch (err) {
-        console.error('❌ Error getting pure Node.js user samples:', err);
+        
         res.status(500).json({ 
             message: 'Internal server error', 
             error: err.message 
         });
+    }
+});
+
+// POST /api/pure-face/sync - Sync profile pictures from Cloudinary (admin only)
+router.post('/sync', auth, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId);
+        if (!user || user.role !== 'admin') {
+            return res.status(403).json({ message: 'Admin access required' });
+        }
+
+        // Trigger sync in background or wait for it? 
+        // Better to trigger and return status
+        pureNodeFaceRecognition.syncCloudinaryProfiles();
+        
+        res.json({
+            success: true,
+            message: 'Cloudinary sync triggered successfully in the background'
+        });
+    } catch (err) {
+        
+        res.status(500).json({ message: 'Internal server error', error: err.message });
     }
 });
 

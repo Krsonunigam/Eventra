@@ -90,7 +90,7 @@ class CertificateGenerator {
         this.doc.restore();
       }
     } catch (error) {
-      console.warn('Could not create watermark:', error.message);
+      
     }
   }
 
@@ -235,7 +235,7 @@ class CertificateGenerator {
           width: 100
         });
     } catch (error) {
-      console.warn('Could not generate QR code:', error.message);
+      
     }
   }
 

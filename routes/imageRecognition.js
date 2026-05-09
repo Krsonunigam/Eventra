@@ -6,7 +6,7 @@ const User = require('../models/User');
 // POST /api/image-recognition/register - Register user with base64 images
 router.post('/register', auth, async (req, res) => {
   try {
-    console.log('Image registration request received for user:', req.user.userId);
+    
     const { images, imageType = 'verification', imageQuality = 'good' } = req.body;
     
     if (!images || !Array.isArray(images) || images.length === 0) {
@@ -18,7 +18,7 @@ router.post('/register', auth, async (req, res) => {
     // Limit the number of images to prevent memory issues
     const limitedImages = images.slice(0, 5);
     if (limitedImages.length < images.length) {
-      console.log(`Limited images from ${images.length} to ${limitedImages.length}`);
+      
     }
 
     const user = await User.findById(req.user.userId);
@@ -40,7 +40,7 @@ router.post('/register', auth, async (req, res) => {
           capturedAt: new Date()
         });
       } else {
-        console.log(`Image ${i} was not added: ${result.message}`);
+        
       }
     }
 
@@ -49,8 +49,8 @@ router.post('/register', auth, async (req, res) => {
     
     await user.save();
 
-    console.log(`Image registration completed for user ${user.email}`);
-    console.log(`Added ${addedImages.length} images out of ${limitedImages.length}`);
+    
+    
 
     return res.json({
       message: 'Images registered successfully',
@@ -64,7 +64,7 @@ router.post('/register', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error in image registration:', error);
+    
     res.status(500).json({ 
       message: 'Image registration failed', 
       error: error.message 
@@ -75,7 +75,7 @@ router.post('/register', auth, async (req, res) => {
 // POST /api/image-recognition/verify - Verify user with base64 image
 router.post('/verify', auth, async (req, res) => {
   try {
-    console.log('Image verification request received for user:', req.user.userId);
+    
     const { imageData } = req.body;
     
     if (!imageData) {
@@ -125,7 +125,7 @@ router.post('/verify', auth, async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Error in image verification:', error);
+    
     res.status(500).json({ 
       message: 'Image verification failed', 
       error: error.message 
@@ -154,7 +154,7 @@ router.get('/status', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error getting image recognition status:', error);
+    
     res.status(500).json({ 
       message: 'Failed to get image recognition status', 
       error: error.message 
@@ -185,7 +185,7 @@ router.post('/compare', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error in image comparison:', error);
+    
     res.status(500).json({ 
       message: 'Image comparison failed', 
       error: error.message 
@@ -219,7 +219,7 @@ router.delete('/clear', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error clearing images:', error);
+    
     res.status(500).json({ 
       message: 'Failed to clear images', 
       error: error.message 

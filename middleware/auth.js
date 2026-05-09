@@ -5,25 +5,25 @@ const AdminSubscription = require('../models/AdminSubscription');
 const auth = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
-    console.log('Auth middleware - Token received:', token ? 'Yes' : 'No');
+    
 
     if (!token) {
-      console.log('Auth middleware - No token provided');
+      
       return res.status(401).json({ message: 'No token provided' });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('Auth middleware - Token decoded successfully for user:', decoded.userId);
-    console.log('Auth middleware - Decoded user ID type:', typeof decoded.userId);
+    
+    
     const user = await User.findById(decoded.userId);
 
     if (!user) {
-      console.log('Auth middleware - User not found for ID:', decoded.userId);
+      
       return res.status(401).json({ message: 'Invalid token' });
     }
 
     if (!user.isActive) {
-      console.log('Auth middleware - User account is deactivated');
+      
       return res.status(401).json({ message: 'Account is deactivated' });
     }
 
@@ -33,13 +33,13 @@ const auth = async (req, res, next) => {
       email: user.email
     };
 
-    console.log('Auth middleware - User authenticated successfully:', user.email);
-    console.log('Auth middleware - Set req.user.userId to:', user._id);
-    console.log('Auth middleware - User ID type:', typeof user._id);
+    
+    
+    
     next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
-    console.error('JWT_SECRET available:', process.env.JWT_SECRET ? 'Yes' : 'No');
+    
+    
     res.status(401).json({ message: 'Invalid token' });
   }
 };
@@ -72,7 +72,7 @@ const adminAuth = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Admin auth middleware error:', error);
+    
     res.status(401).json({ message: 'Invalid token' });
   }
 };
@@ -121,7 +121,7 @@ const premiumAdminAuth = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Premium admin auth middleware error:', error);
+    
     res.status(401).json({ message: 'Invalid token' });
   }
 };

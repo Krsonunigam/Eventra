@@ -131,7 +131,7 @@ const generateExcelReport = async (attendanceList, event, type = 'all') => {
     return buffer;
 
   } catch (error) {
-    console.error('Error generating Excel report:', error);
+    
     throw error;
   }
 };
@@ -187,7 +187,7 @@ const generateUserReport = async (users) => {
     return buffer;
 
   } catch (error) {
-    console.error('Error generating user report:', error);
+    
     throw error;
   }
 };
@@ -243,7 +243,7 @@ const generateEventReport = async (events) => {
     return buffer;
 
   } catch (error) {
-    console.error('Error generating event report:', error);
+    
     throw error;
   }
 };

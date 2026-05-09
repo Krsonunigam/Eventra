@@ -4,8 +4,10 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Edit } from 'lucide-react';
 import api from '../../utils/axiosConfig';
 import EventForm from '../../components/Forms/EventForm';
+import useCustomToast from '../../utils/customToast';
 
 const EventEdit = () => {
+  const toast = useCustomToast();
   const [loading, setLoading] = useState(false);
   const [eventData, setEventData] = useState(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
@@ -16,10 +18,10 @@ const EventEdit = () => {
     const fetchEvent = async () => {
       try {
         const response = await api.get(`/api/admin/events/${id}`);
-        console.log('Fetched event data:', response.data);
+        
         setEventData(response.data);
       } catch (error) {
-        console.error('Error fetching event:', error);
+        
         navigate('/admin/events');
       } finally {
         setLoadingEvent(false);
@@ -37,7 +39,7 @@ const EventEdit = () => {
       // Handle image upload if present
       let imageUrl = eventData?.image || '';
       if (formData.bannerImage && formData.bannerImage instanceof File) {
-        console.log('Uploading new image...');
+        
         const uploadFormData = new FormData();
         uploadFormData.append('eventImage', formData.bannerImage);
         
@@ -45,14 +47,14 @@ const EventEdit = () => {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
         imageUrl = uploadResponse.data.url;
-        console.log('Image uploaded successfully:', imageUrl);
+        
       } else if (formData.bannerImage === null) {
         // If banner was removed, set to empty string
         imageUrl = '';
-        console.log('Image removed');
+        
       } else {
         // Keep existing image
-        console.log('Keeping existing image:', imageUrl);
+        
       }
 
       // Prepare the event data
@@ -86,21 +88,23 @@ const EventEdit = () => {
         detailedSchedule: formData.detailedSchedule || [],
         sponsors: formData.sponsors || [],
         organizerContact: formData.organizerContact || {},
-        organizer: eventData.organizer._id || eventData.organizer, // Extract ObjectId from organizer object
+        organizer: eventData?.organizer?._id || eventData?.organizer || formData?.organizer?._id || '',
         image: imageUrl
       };
 
-      console.log('Updating event with data:', JSON.stringify(updatedEventData, null, 2));
+      
+
+      
 
       const response = await api.put(`/api/admin/events/${id}`, updatedEventData);
 
-      console.log('Event updated successfully:', response.data);
+      
       navigate('/admin/events', { 
         state: { message: 'Event updated successfully!' }
       });
     } catch (error) {
-      console.error('Error updating event:', error);
-      alert(`Error updating event: ${error.message}`);
+      
+      toast.error(error.response?.data?.message || `Error updating event: ${error.message}`);
     } finally {
       setLoading(false);
     }

@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -5,10 +6,13 @@ const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-require('dotenv').config();
+const paymentRoutes = require("./routes/paymentRoutes");
 
 // Set timezone to IST
 process.env.TZ = 'Asia/Kolkata';
+
+
+
 
 const app = express();
 
@@ -18,6 +22,17 @@ app.use((req, res, next) => {
   res.setTimeout(300000); // 5 minutes
   next();
 });
+
+// CORS configuration - Localhost only
+app.use(cors({
+  origin: [
+    'http://127.0.0.1:3000',
+    'http://localhost:3000'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with']
+}));
 
 // Security middleware
 // Trust the proxy (e.g., CRA dev server) so rate limiter can read X-Forwarded-For safely
@@ -56,19 +71,17 @@ if (process.env.NODE_ENV !== 'development') {
   });
   app.use(limiter);
 } else {
-  console.log('Rate limiting disabled for development');
+  
 }
 
-// CORS configuration - Localhost only
-app.use(cors({
-  origin: [
-    'http://127.0.0.1:3000',
-    'http://localhost:3000'
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with']
-}));
+
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  autoIndex: false
+})
+.then(() => {})
+.catch(err => {});
 
 // Handle preflight requests
 app.options('*', (req, res) => {
@@ -84,24 +97,29 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // MongoDB connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://photossonu2025_db_user:uw3pHYFKEwhp2FBS@clustor1.jribxky.mongodb.net/test?retryWrites=true&w=majority&appName=Clustor1', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 5000, // 5 second timeout
-  socketTimeoutMS: 45000, // 45 second timeout
-  connectTimeoutMS: 10000, // 10 second timeout
-  maxPoolSize: 10, // Maintain up to 10 socket connections
-  minPoolSize: 5, // Maintain a minimum of 5 socket connections
-})
-.then(() => console.log('MongoDB connected successfully'))
-.catch(err => console.error('MongoDB connection error:', err));
+mongoose.connection.once("open", async () => {
+  try {
+    const collection = mongoose.connection.db.collection("users");
 
+    const indexes = await collection.indexes();
+
+    for (let index of indexes) {
+      if (index.name.includes("nfcCards.cardId")) {
+        await collection.dropIndex(index.name);
+      }
+    }
+
+    
+  } catch (err) {
+    
+  }
+});
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/events', require('./routes/events'));
 app.use('/api/attendance', require('./routes/attendance'));
-app.use('/api/payments', require('./routes/payments'));
+app.use("/api/payments", paymentRoutes);
 app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/admin/subscription', require('./routes/adminSubscription'));
@@ -116,16 +134,7 @@ app.use('/api/email', require('./routes/emailVerification'));
 app.use('/api/upload', require('./routes/upload'));
 app.use('/api/certificates', require('./routes/certificates'));
 
-// Serve uploaded files with CORS headers
-app.use('/uploads', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
-  next();
-}, express.static('uploads'));
 
-
-// Serve static files from React build
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static('client/build'));
   
@@ -136,7 +145,7 @@ if (process.env.NODE_ENV === 'production') {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  
   res.status(500).json({ 
     message: 'Something went wrong!',
     error: process.env.NODE_ENV === 'production' ? {} : err.stack
@@ -152,5 +161,5 @@ const PORT = process.env.PORT || 5000;
 const HOST = '127.0.0.1'; // Force localhost only
 
 app.listen(PORT, HOST, () => {
-  console.log(`Server running on ${HOST}:${PORT}`);
+  
 });

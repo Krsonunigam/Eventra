@@ -53,7 +53,7 @@ const Register = () => {
   };
 
   const handleFaceTrainingComplete = (result) => {
-    console.log('Face training completed:', result);
+    
     toast.faceRegistrationSuccess('Face training completed successfully!');
     setShowFaceCapture(false);
     
@@ -102,11 +102,11 @@ const Register = () => {
           transition={{ duration: 0.6 }}
           className="text-center"
         >
-          <div className="flex justify-center">
+          {/* <div className="flex justify-center">
             <div className="w-16 h-16 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-xl flex items-center justify-center">
               <Calendar className="h-8 w-8 text-white" />
             </div>
-          </div>
+          </div> */}
           <h2 className="mt-6 text-3xl font-bold text-white">
             Create your account
           </h2>

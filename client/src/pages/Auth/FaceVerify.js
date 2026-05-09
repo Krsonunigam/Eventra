@@ -31,14 +31,14 @@ const FaceVerify = () => {
   }, []);
 
   const handleTrainingComplete = (result) => {
-    console.log('Training completed:', result);
+    
     setShowFaceTraining(false);
     setShowFaceVerification(true);
     setHasFaceData(true);
   };
 
   const handleVerificationSuccess = (result) => {
-    console.log('Verification successful:', result);
+    
     setShowFaceVerification(false);
     
     // Clear the redirect data from localStorage
@@ -58,7 +58,7 @@ const FaceVerify = () => {
   };
 
   const handleVerificationFailure = (error) => {
-    console.log('Verification failed:', error);
+    
     // Could show error message or retry option
   };
 

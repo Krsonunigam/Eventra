@@ -60,7 +60,7 @@ const checkSubscription = async (req, res, next) => {
     next();
 
   } catch (error) {
-    console.error('Subscription check error:', error);
+    
     res.status(500).json({ 
       message: 'Failed to verify subscription',
       success: false,
@@ -88,7 +88,7 @@ const checkSubscriptionStatus = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Subscription status check error:', error);
+    
     next(); // Continue even if subscription check fails
   }
 };
@@ -133,7 +133,7 @@ const getSubscriptionStatus = async (userId) => {
       isExpiringSoon: isSubscriptionExpiringSoon(subscription)
     };
   } catch (error) {
-    console.error('Get subscription status error:', error);
+    
     return {
       hasActiveSubscription: false,
       status: 'error'

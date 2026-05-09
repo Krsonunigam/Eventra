@@ -21,6 +21,7 @@ import QrScanner from 'qr-scanner';
 
 const AdminQRScanner = ({ onClose, onSuccess, eventId, eventTitle }) => {
   const videoRef = useRef(null);
+  const streamRef = useRef(null);
   const canvasRef = useRef(null);
   const scanAnimRef = useRef(null);
   const toast = useCustomToast();
@@ -36,206 +37,223 @@ const AdminQRScanner = ({ onClose, onSuccess, eventId, eventTitle }) => {
   const [uploadedFile, setUploadedFile] = useState(null);
   const fileInputRef = useRef(null);
 
+  // 30-second event lock state
+  const [eventLockActive, setEventLockActive] = useState(false);
+  const [eventLockRemaining, setEventLockRemaining] = useState(0);
+  const eventLockTimerRef = useRef(null);
+  const eventLockCountdownRef = useRef(null);
+
+  // Live decode feedback
+  const [lastDecodedRaw, setLastDecodedRaw] = useState(null);
+  const [lastDecodedParsed, setLastDecodedParsed] = useState(null);
+  const [lastApiError, setLastApiError] = useState(null);
+
+  const scannerRef = useRef(null);
+  const processingRef = useRef(false); // Ref to avoid stale closure in QrScanner callback
+
+  // Start 30-second event lock after successful scan
+  const startEventLock = () => {
+    // Clear any existing timers
+    clearTimeout(eventLockTimerRef.current);
+    clearInterval(eventLockCountdownRef.current);
+
+    setEventLockActive(true);
+    setEventLockRemaining(30);
+
+    // Countdown every second
+    let remaining = 30;
+    eventLockCountdownRef.current = setInterval(() => {
+      remaining -= 1;
+      setEventLockRemaining(remaining);
+      if (remaining <= 0) {
+        clearInterval(eventLockCountdownRef.current);
+      }
+    }, 1000);
+
+    // Release lock after 30s
+    eventLockTimerRef.current = setTimeout(() => {
+      setEventLockActive(false);
+      setEventLockRemaining(0);
+    }, 30000);
+  };
+
+  // Cleanup timers on unmount
   useEffect(() => {
-    startCamera();
     return () => {
-      stopCamera();
+      clearTimeout(eventLockTimerRef.current);
+      clearInterval(eventLockCountdownRef.current);
     };
   }, []);
 
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'environment' // Use back camera if available
-        } 
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setIsScanning(true);
-      }
+  useEffect(() => {
+    startScanning();
+    return () => {
+      stopScanning();
+    };
+  }, []);
 
-      // Check support for BarcodeDetector
-      const supported = 'BarcodeDetector' in window;
-      setSupportsDetector(supported);
-      if (supported) {
-        startRealTimeScanning();
-      }
+  const startScanning = async () => {
+    if (!videoRef.current) return;
+
+    try {
+      scannerRef.current = new QrScanner(
+        videoRef.current,
+        async (result) => {
+          if (!result) return;
+          const text = result.data;
+          // Use ref (not state) to avoid stale closure bug — state reads always give initial value here
+          if (!text || processingRef.current) {
+            
+            return;
+          }
+          
+          setScannedData(text);
+          await processQRCode(text);
+          setTimeout(() => { setScannedData(null); }, 5000);
+        },
+        {
+          highlightScanRegion: true,
+          highlightCodeOutline: true,
+          returnDetailedScanResult: true,
+          preferredCamera: 'environment'
+        }
+      );
+
+      await scannerRef.current.start();
+      setIsScanning(true);
       startLaserAnimation();
     } catch (error) {
-      console.error('Error accessing camera:', error);
-      toast.error('Camera access denied. Please allow camera permission.');
+      
+      toast.error('Could not start camera. Please check permissions.');
     }
   };
 
-  const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = videoRef.current.srcObject.getTracks();
-      tracks.forEach(track => track.stop());
-      videoRef.current.srcObject = null;
+  const stopScanning = () => {
+    if (scannerRef.current) {
+      scannerRef.current.stop();
+      scannerRef.current.destroy();
+      scannerRef.current = null;
     }
     setIsScanning(false);
-    if (scanAnimRef.current) {
-      cancelAnimationFrame(scanAnimRef.current);
-      scanAnimRef.current = null;
-    }
-  };
-
-  const startRealTimeScanning = async () => {
-    try {
-      const formats = ['qr_code'];
-      const detector = new window.BarcodeDetector({ formats });
-
-      const scan = async () => {
-        if (!videoRef.current || isProcessing) {
-          scanAnimRef.current = requestAnimationFrame(scan);
-          return;
-        }
-
-        try {
-          const codes = await detector.detect(videoRef.current);
-          if (codes && codes.length > 0) {
-            const text = codes[0].rawValue || codes[0].rawValue === '' ? codes[0].rawValue : codes[0].rawValue;
-            if (text) {
-              setScannedData(text);
-              await processQRCode(text);
-            }
-          }
-        } catch (_) {
-          // ignore frame errors
-        }
-
-        scanAnimRef.current = requestAnimationFrame(scan);
-      };
-
-      scan();
-    } catch (e) {
-      console.log('BarcodeDetector not available or failed to start');
-    }
   };
 
   const startLaserAnimation = () => {
-    const max = 192; // approximately within overlay box
     const animate = () => {
-      setLaserY(prev => (prev >= max ? 0 : prev + 3));
+      setLaserY(prev => (prev >= 250 ? 0 : prev + 4));
       scanAnimRef.current = requestAnimationFrame(animate);
     };
-    if (!scanAnimRef.current) {
-      scanAnimRef.current = requestAnimationFrame(animate);
-    }
+    if (scanAnimRef.current) cancelAnimationFrame(scanAnimRef.current);
+    scanAnimRef.current = requestAnimationFrame(animate);
   };
 
   const processQRCode = async (qrData) => {
+    if (processingRef.current) {
+      
+      return;
+    }
+    processingRef.current = true;
     setIsProcessing(true);
     setScanCount(prev => prev + 1);
+    setLastApiError(null);
     
     try {
-      console.log('Processing QR code for admin:', qrData);
       
-      // Send QR data for admin attendance marking (as object if possible)
+      
+      // Show raw decode immediately
+      setLastDecodedRaw(qrData);
+      
       let payloadQR = qrData;
       try {
         payloadQR = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
+        
+        setLastDecodedParsed(payloadQR);
       } catch (_) {
-        // leave as is if not JSON string
+        
+        setLastDecodedParsed({ raw: qrData });
       }
+
+      
+
       const response = await api.post('/api/attendance/admin/qr-scan', {
-        qrData: payloadQR
+        qrData: payloadQR,
+        targetEventId: eventId
       });
 
+      
+
       if (response.data.success) {
-        setAttendanceResult({
-          success: true,
-          data: response.data
-        });
-        toast.success('Student attendance marked successfully!');
-        
-        // Call the onSuccess callback with attendance data
-        if (onSuccess) {
-          onSuccess(response.data);
-        }
-        
-        // Show success for 3 seconds then allow next scan
-        setTimeout(() => {
-          setAttendanceResult(null);
-          setScannedData(null);
-        }, 3000);
+        setAttendanceResult({ success: true, data: response.data });
+        toast.success(`Access Granted: ${response.data.student?.name || 'Student'}`);
+        if (onSuccess) onSuccess(response.data);
+        startEventLock(); // Start 30s event lock
+        setTimeout(() => { setAttendanceResult(null); setScannedData(null); }, 4000);
       } else {
-        setAttendanceResult({
-          success: false,
-          message: response.data.message
-        });
+        setLastApiError(response.data.message || 'Marking failed');
+        setAttendanceResult({ success: false, message: response.data.message });
         toast.error(response.data.message || 'Attendance marking failed');
-        
-        // Show error for 2 seconds then clear
-        setTimeout(() => {
-          setAttendanceResult(null);
-        }, 2000);
+        setTimeout(() => { setAttendanceResult(null); }, 3000);
       }
     } catch (error) {
-      console.error('Admin QR attendance error:', error);
+      
       const errorMessage = error.response?.data?.message || 'Failed to mark attendance';
       const isAlreadyMarked = error.response?.data?.alreadyMarked;
-      
-      setAttendanceResult({
-        success: false,
-        message: errorMessage,
-        alreadyMarked: isAlreadyMarked
-      });
-      
+      setLastApiError(errorMessage);
+      setAttendanceResult({ success: false, message: errorMessage, alreadyMarked: isAlreadyMarked });
       if (isAlreadyMarked) {
         toast.warning(errorMessage);
       } else {
         toast.error(errorMessage);
       }
-      
-      // Show error for 3 seconds then clear
-      setTimeout(() => {
-        setAttendanceResult(null);
-      }, 3000);
+      setTimeout(() => { setAttendanceResult(null); }, 4000);
     } finally {
-      setIsProcessing(false);
+      // Hold lock for 2.5s to prevent duplicate scans of the same QR
+      setTimeout(() => {
+        processingRef.current = false;
+        setIsProcessing(false);
+      }, 2500);
     }
   };
 
   const submitManualBooking = async () => {
     if (!manualBookingId?.trim()) {
-      toast.error('Please enter a Booking ID');
+      toast.error('Please enter a Booking ID or Verification Code');
       return;
     }
+    if (processingRef.current) return;
+    processingRef.current = true;
     setIsProcessing(true);
     try {
+      const input = manualBookingId.trim();
+      // Support: full ObjectId bookingId, 8-char verificationCode, or 6-digit code
+      const isObjectId = /^[a-fA-F0-9]{24}$/.test(input);
+      const payload = isObjectId 
+        ? { bookingId: input } 
+        : { verificationCode: input };  // treat as verificationCode for shorter codes
+
+      
       const response = await api.post('/api/attendance/admin/qr-scan', {
-        qrData: { bookingId: manualBookingId.trim() }
+        qrData: payload,
+        targetEventId: eventId
       });
       if (response.data.success) {
         setAttendanceResult({ success: true, data: response.data });
-        toast.success('Student attendance marked successfully!');
-        
-        // Call the onSuccess callback with attendance data
-        if (onSuccess) {
-          onSuccess(response.data);
-        }
-        
+        toast.success(`Attendance marked: ${response.data.student?.name || 'Student'}`);
+        if (onSuccess) onSuccess(response.data);
         setManualBookingId('');
-        setTimeout(() => {
-          setAttendanceResult(null);
-        }, 3000);
+        setTimeout(() => { setAttendanceResult(null); }, 3000);
       } else {
         toast.error(response.data.message || 'Failed to mark attendance');
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Failed to mark attendance';
       const isAlreadyMarked = error.response?.data?.alreadyMarked;
-      
       if (isAlreadyMarked) {
         toast.warning(errorMessage);
       } else {
         toast.error(errorMessage);
       }
     } finally {
-      setIsProcessing(false);
+      setTimeout(() => { processingRef.current = false; setIsProcessing(false); }, 1000);
     }
   };
 
@@ -262,7 +280,7 @@ const AdminQRScanner = ({ onClose, onSuccess, eventId, eventTitle }) => {
         toast.error('No QR code found in the image');
       }
     } catch (error) {
-      console.error('QR scan error:', error);
+      
       toast.error('Failed to scan QR code from image');
     } finally {
       setIsUploading(false);
@@ -324,6 +342,14 @@ const AdminQRScanner = ({ onClose, onSuccess, eventId, eventTitle }) => {
     setAttendanceResult(null);
     setScannedData(null);
     setIsProcessing(false);
+    setLastDecodedRaw(null);
+    setLastDecodedParsed(null);
+    setLastApiError(null);
+    // Also release event lock
+    clearTimeout(eventLockTimerRef.current);
+    clearInterval(eventLockCountdownRef.current);
+    setEventLockActive(false);
+    setEventLockRemaining(0);
   };
 
   return (
@@ -331,277 +357,287 @@ const AdminQRScanner = ({ onClose, onSuccess, eventId, eventTitle }) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md"
     >
-      <div className="bg-gray-800 rounded-xl p-6 max-w-lg w-full mx-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
-            <Shield className="h-6 w-6 text-blue-400 mr-2" />
-            <h3 className="text-xl font-semibold text-white flex items-center">
-              <QrCode className="h-5 w-5 mr-2" />
-              Admin QR Scanner
-            </h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
-
-        {/* Event Info */}
-        <div className="mb-4 p-3 bg-blue-900 bg-opacity-30 rounded-lg border border-blue-500">
-          <div className="flex items-center text-blue-300 text-sm mb-1">
-            <Calendar className="h-4 w-4 mr-2" />
-            <span className="font-medium">Event: {eventTitle || 'Current Event'}</span>
-          </div>
-          <div className="flex items-center text-blue-300 text-sm">
-            <Users className="h-4 w-4 mr-2" />
-            <span>Scan student QR codes to mark attendance</span>
-          </div>
-        </div>
-
-        <div className="relative">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            className="w-full h-64 bg-gray-900 rounded-lg"
-          />
-          <canvas
-            ref={canvasRef}
-            className="hidden"
-          />
-          
-          {/* QR scanning overlay */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-48 h-48 border-2 border-blue-400 rounded-lg relative">
-              <div className="absolute inset-0 border-2 border-blue-400 rounded-lg animate-pulse"></div>
-              <div className="absolute top-2 left-2 w-6 h-6 border-l-2 border-t-2 border-blue-400"></div>
-              <div className="absolute top-2 right-2 w-6 h-6 border-r-2 border-t-2 border-blue-400"></div>
-              <div className="absolute bottom-2 left-2 w-6 h-6 border-l-2 border-b-2 border-blue-400"></div>
-              <div className="absolute bottom-2 right-2 w-6 h-6 border-r-2 border-b-2 border-blue-400"></div>
-              {/* Scanning laser */}
-              <div
-                className="absolute left-0 right-0 h-0.5 bg-red-500 opacity-80"
-                style={{ top: `${laserY}px` }}
-              />
-              
-              {/* Admin indicator */}
-              <div className="absolute -top-8 left-1/2 transform -translate-x-1/2">
-                <div className="bg-blue-500 text-white px-2 py-1 rounded text-xs font-medium">
-                  ADMIN SCANNER
+      <div className="bg-[#0f0f0f] w-full h-full md:h-[95vh] md:w-[98vw] md:max-w-7xl md:rounded-3xl overflow-hidden border-none md:border md:border-white/10 shadow-2xl flex flex-col md:flex-row">
+        
+        {/* LEFT COLUMN - CAMERA FEED */}
+        <div className="w-full md:w-[55%] bg-black relative flex flex-col h-[45vh] md:h-auto border-b md:border-b-0 md:border-r border-white/10">
+          <div className="p-6 absolute top-0 w-full z-10 flex justify-between items-center bg-gradient-to-b from-black/90 to-transparent">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-emerald-500 rounded-xl shadow-lg shadow-emerald-500/20">
+                <Shield className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex flex-col">
+                <h3 className="text-white font-bold text-lg leading-tight">Admin QR Scanner</h3>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                  <span className="text-emerald-400 text-[10px] uppercase tracking-[0.2em] font-black">System Online</span>
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Processing indicator */}
-          {isProcessing && (
-            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg">
-              <div className="text-center text-white">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mx-auto mb-2"></div>
-                <p className="text-sm">Processing QR Code...</p>
-                <p className="text-xs text-gray-300">Marking student attendance</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-4 text-center">
-          <p className="text-gray-300 text-sm mb-2">
-            Position the student's QR code from their event pass within the frame
-          </p>
-          <p className="text-gray-400 text-xs">
-            Attendance can be marked 15 minutes before event starts
-          </p>
-          {scanCount > 0 && (
-            <p className="text-blue-400 text-xs mt-1">
-              Scans processed: {scanCount}
-            </p>
-          )}
-        </div>
-
-        {/* QR Code Upload */}
-        <div className="mt-4 bg-gray-700 rounded-lg p-3">
-          <div className="text-left text-gray-200 text-sm mb-2 font-medium">Upload QR Code Image</div>
-          <div
-            className="border-2 border-dashed border-gray-500 rounded-lg p-4 text-center hover:border-blue-400 transition-colors cursor-pointer"
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-            {isUploading ? (
-              <div className="text-blue-400">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400 mx-auto mb-2"></div>
-                <p className="text-sm">Processing QR code...</p>
-              </div>
-            ) : uploadedFile ? (
-              <div className="text-green-400">
-                <FileImage className="h-8 w-8 mx-auto mb-2" />
-                <p className="text-sm">{uploadedFile.name}</p>
-                <p className="text-xs text-gray-400">Click to upload another</p>
-              </div>
-            ) : (
-              <div className="text-gray-400">
-                <Upload className="h-8 w-8 mx-auto mb-2" />
-                <p className="text-sm">Drop QR image here or click to browse</p>
-                <p className="text-xs text-gray-500">Supports JPG, PNG, WebP</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Manual Booking ID Entry */}
-        <div className="mt-4 bg-gray-700 rounded-lg p-3">
-          <div className="text-left text-gray-200 text-sm mb-2 font-medium">Mark via Booking ID</div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={manualBookingId}
-              onChange={(e) => setManualBookingId(e.target.value)}
-              placeholder="Enter Booking ID"
-              className="flex-1 bg-gray-800 text-white px-3 py-2 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              onClick={submitManualBooking}
-              disabled={isProcessing}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg"
+            <button 
+              onClick={onClose} 
+              className="md:hidden p-2 bg-white/10 text-white rounded-full hover:bg-white/20 transition-all"
             >
-              Mark
+              <X className="h-6 w-6" />
             </button>
           </div>
-        </div>
-
-        <div className="mt-4 flex space-x-2">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-          >
-            Close
-          </button>
-          <button
-            onClick={resetScanner}
-            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
-          >
-            Reset
-          </button>
-          <button
-            onClick={scanQRCode}
-            disabled={isProcessing}
-            className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded-lg transition-colors flex items-center justify-center"
-          >
-            {isProcessing ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Processing...
-              </>
-            ) : (
-              <>
-                <QrCode className="h-4 w-4 mr-2" />
-                Scan QR Code
-              </>
+          
+          <div className="relative flex-grow flex items-center justify-center bg-gray-900">
+            <video 
+              ref={videoRef} 
+              autoPlay 
+              playsInline 
+              muted 
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${!isScanning ? 'opacity-0' : 'opacity-100'}`}
+            />
+            
+            {!isScanning && (
+              <div className="flex flex-col items-center justify-center text-gray-500 text-center px-10">
+                <div className="w-16 h-16 border-4 border-white/5 border-t-emerald-500 rounded-full animate-spin mb-6"></div>
+                <p className="text-gray-400 font-medium tracking-wide">Syncing Security Feed...</p>
+              </div>
             )}
-          </button>
-        </div>
 
-        {/* Attendance Result Display */}
-        {attendanceResult && (
-          <div className="mt-4 p-4 rounded-lg border">
-            {attendanceResult.success ? (
-              <div className="text-center">
-                <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-2" />
-                <h4 className="text-green-400 font-semibold mb-2">Attendance Marked!</h4>
-                
-                {attendanceResult.data && (
-                  <div className="text-left text-sm text-gray-300 space-y-2">
-                    <div className="flex items-center">
-                      <User className="h-4 w-4 mr-2 text-gray-400" />
-                      <span><strong>Student:</strong> {attendanceResult.data.student.name}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <User className="h-4 w-4 mr-2 text-gray-400" />
-                      <span><strong>Email:</strong> {attendanceResult.data.student.email}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                      <span><strong>Event:</strong> {attendanceResult.data.event.title}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Clock className="h-4 w-4 mr-2 text-gray-400" />
-                      <span><strong>Time:</strong> {formatTime(attendanceResult.data.attendance.timestamp)}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <MapPin className="h-4 w-4 mr-2 text-gray-400" />
-                      <span><strong>Location:</strong> {attendanceResult.data.event.location}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Shield className="h-4 w-4 mr-2 text-gray-400" />
-                      <span><strong>Status:</strong> {attendanceResult.data.timing.status}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Eye className="h-4 w-4 mr-2 text-gray-400" />
-                      <span><strong>Method:</strong> {attendanceResult.data.attendance.method}</span>
-                    </div>
+            {/* Premium Scanning Overlay */}
+            {isScanning && (
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div className="w-64 h-64 md:w-80 md:h-80 border border-emerald-400/20 rounded-[2.5rem] relative">
+                  {/* Glowing Corners */}
+                  <div className="absolute -top-1 -left-1 w-12 h-12 border-l-[6px] border-t-[6px] border-emerald-500 rounded-tl-[2rem] shadow-[-5px_-5px_15px_rgba(16,185,129,0.4)]"></div>
+                  <div className="absolute -top-1 -right-1 w-12 h-12 border-r-[6px] border-t-[6px] border-emerald-500 rounded-tr-[2rem] shadow-[5px_-5px_15px_rgba(16,185,129,0.4)]"></div>
+                  <div className="absolute -bottom-1 -left-1 w-12 h-12 border-l-[6px] border-b-[6px] border-emerald-500 rounded-bl-[2rem] shadow-[-5px_5px_15px_rgba(16,185,129,0.4)]"></div>
+                  <div className="absolute -bottom-1 -right-1 w-12 h-12 border-r-[6px] border-b-[6px] border-emerald-500 rounded-br-[2rem] shadow-[5px_5px_15px_rgba(16,185,129,0.4)]"></div>
+                  
+                  {/* Dynamic Laser */}
+                  <motion.div 
+                    animate={{ top: ['5%', '95%', '5%'] }}
+                    transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute left-6 right-6 h-[3px] bg-red-500 shadow-[0_0_20px_#ef4444,0_0_40px_#ef4444] z-10 rounded-full opacity-80"
+                  />
+
+                  <div className="absolute -top-14 left-1/2 transform -translate-x-1/2 bg-emerald-500 text-white px-5 py-1.5 rounded-full text-[11px] font-black uppercase tracking-[0.2em] shadow-xl border border-white/20">
+                    Scanning Mode
                   </div>
-                )}
-                
-                <div className="mt-3 text-xs text-gray-400">
-                  Ready for next scan...
-                </div>
-              </div>
-            ) : (
-              <div className="text-center">
-                {attendanceResult.alreadyMarked ? (
-                  <>
-                    <Clock className="h-12 w-12 text-yellow-400 mx-auto mb-2" />
-                    <h4 className="text-yellow-400 font-semibold mb-2">Already Marked</h4>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-2" />
-                    <h4 className="text-red-400 font-semibold mb-2">Scan Failed</h4>
-                  </>
-                )}
-                <p className="text-gray-300 text-sm">{attendanceResult.message}</p>
-                <div className="mt-2 text-xs text-gray-400">
-                  {attendanceResult.alreadyMarked ? 'Student already attended' : 'Try scanning again...'}
                 </div>
               </div>
             )}
-          </div>
-        )}
 
-        {/* Instructions */}
-        <div className="mt-4 p-3 bg-gray-700 rounded-lg">
-          <h5 className="text-white text-sm font-medium mb-2">Admin Instructions:</h5>
-          <ul className="text-gray-300 text-xs space-y-1">
-            <li>• Ask students to show their event pass QR code</li>
-            <li>• Position the QR code within the scanning frame OR upload QR image</li>
-            <li>• Attendance is automatically marked and saved to database</li>
-            <li>• Students can only be marked present once per event</li>
-            <li>• Attendance window: 15 minutes before to 30 minutes after start</li>
-            <li>• All attendance records are tracked with admin verification</li>
-            <li>• Alternative: Enter Booking ID manually or upload QR image file</li>
-          </ul>
-        </div>
-
-        {/* Statistics */}
-        {scanCount > 0 && (
-          <div className="mt-3 p-2 bg-blue-900 bg-opacity-30 rounded-lg">
-            <div className="text-center text-blue-300 text-sm">
-              <span className="font-medium">Scans Processed: {scanCount}</span>
+            {/* Processing State */}
+            {isProcessing && (
+              <div className="absolute inset-0 bg-black/70 backdrop-blur-md flex flex-col items-center justify-center z-30">
+                <div className="relative w-20 h-20">
+                  <div className="absolute inset-0 border-4 border-emerald-500/20 rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-t-emerald-500 rounded-full animate-spin"></div>
+                </div>
+                <p className="mt-6 text-white text-lg font-bold tracking-widest uppercase animate-pulse">Verifying Access</p>
+              </div>
+            )}
+            
+            {/* Context Badge */}
+            <div className="absolute bottom-10 left-0 w-full flex justify-center z-10 px-6">
+              <div className="px-6 py-3 bg-white/5 backdrop-blur-2xl rounded-2xl border border-white/10 text-center max-w-sm shadow-2xl">
+                 <p className="text-[10px] text-emerald-400 uppercase tracking-[0.3em] font-black mb-1">Target Event</p>
+                 <p className="text-white text-base font-bold truncate tracking-tight">{eventTitle || 'Event Attendance'}</p>
+              </div>
             </div>
           </div>
-        )}
+        </div>
+
+        {/* RIGHT COLUMN - CONTROLS & LOGS */}
+        <div className="w-full md:w-[45%] p-6 md:p-8 flex flex-col relative bg-[#0f0f0f] overflow-y-auto custom-scrollbar">
+          <button 
+            onClick={onClose} 
+            className="hidden md:flex absolute top-4 right-4 p-2 text-gray-500 hover:text-white rounded-xl hover:bg-white/5 transition-all"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          
+          <div className="mb-6 mt-2 md:mt-0">
+            <h2 className="text-2xl font-black text-white mb-1 tracking-tight">Access Control</h2>
+            <p className="text-gray-500 text-[11px] font-medium tracking-wide uppercase">Entry Management Portal</p>
+          </div>
+
+          <div className="space-y-5 flex-grow">
+            
+            {/* ATTENDANCE RESULT */}
+            {attendanceResult ? (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`p-5 rounded-2xl border ${
+                  attendanceResult.success 
+                    ? 'bg-emerald-500/10 border-emerald-500/30' 
+                    : attendanceResult.alreadyMarked 
+                      ? 'bg-amber-500/10 border-amber-500/30' 
+                      : 'bg-red-500/10 border-red-500/30'
+                }`}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className={`p-3 rounded-2xl mb-3 ${
+                    attendanceResult.success ? 'bg-emerald-500 text-white' : 
+                    attendanceResult.alreadyMarked ? 'bg-amber-500 text-white' : 'bg-red-500 text-white'
+                  }`}>
+                    {attendanceResult.success ? <CheckCircle className="h-6 w-6" /> : 
+                     attendanceResult.alreadyMarked ? <Clock className="h-6 w-6" /> : <AlertCircle className="h-6 w-6" />}
+                  </div>
+                  
+                  <h4 className={`text-lg font-black mb-1 uppercase tracking-tight ${
+                    attendanceResult.success ? 'text-emerald-400' : 
+                    attendanceResult.alreadyMarked ? 'text-amber-400' : 'text-red-400'
+                  }`}>
+                    {attendanceResult.success ? 'Access Granted' : 
+                     attendanceResult.alreadyMarked ? 'Duplicate' : 'Denied'}
+                  </h4>
+                  
+                  <p className="text-gray-400 text-[11px] font-medium px-4 mb-4">{attendanceResult.message || 'System verification complete.'}</p>
+
+                  {attendanceResult.success && attendanceResult.data && (
+                    <div className="w-full space-y-2 px-2">
+                      <div className="flex justify-between p-3 bg-white/5 rounded-xl border border-white/5 items-center">
+                        <span className="text-[9px] text-gray-500 uppercase font-black">Student</span>
+                        <span className="text-white text-xs font-bold">{attendanceResult.data.student?.name || '—'}</span>
+                      </div>
+                      {attendanceResult.data.attendance?.timestamp && (
+                        <div className="flex justify-between p-3 bg-white/5 rounded-xl border border-white/5 items-center">
+                          <span className="text-[9px] text-gray-500 uppercase font-black">Time</span>
+                          <span className="text-white text-xs font-bold">{formatTime(attendanceResult.data.attendance.timestamp)}</span>
+                        </div>
+                      )}
+                      {attendanceResult.data.isOverride && (
+                        <div className="flex justify-between p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 items-center">
+                          <span className="text-[9px] text-amber-500 uppercase font-black">Note</span>
+                          <span className="text-amber-400 text-xs font-bold">Override — Re-register face</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <button 
+                    onClick={() => setAttendanceResult(null)}
+                    className="w-full mt-5 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all"
+                  >
+                    Next Scan
+                  </button>
+                </div>
+              </motion.div>
+            ) : (
+              <>
+                {/* MANUAL ENTRY */}
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] px-1">Manual Bypass</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-grow group">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-600">
+                        <User className="h-4 w-4" />
+                      </div>
+                      <input
+                        type="text"
+                        value={manualBookingId}
+                        onChange={(e) => setManualBookingId(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && submitManualBooking()}
+                        placeholder="Booking ID..."
+                        className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:border-emerald-500/50 text-white placeholder-gray-700 text-sm font-bold"
+                      />
+                    </div>
+                    <button
+                      onClick={submitManualBooking}
+                      disabled={isProcessing}
+                      className="px-5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-lg shadow-emerald-500/10"
+                    >
+                      Mark
+                    </button>
+                  </div>
+                </div>
+
+                {/* UPLOAD */}
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] px-1">Remote Scan</label>
+                  <div
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="group border border-dashed border-white/10 rounded-2xl p-5 text-center hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all cursor-pointer relative"
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    {isUploading ? (
+                      <div className="flex flex-col items-center">
+                        <div className="w-6 h-6 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-2"></div>
+                        <p className="text-emerald-400 font-bold uppercase tracking-widest text-[9px]">Analyzing...</p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center space-x-4">
+                        <div className="p-3 bg-white/5 rounded-xl group-hover:bg-emerald-500/10 transition-all shadow-lg">
+                          <Upload className="h-5 w-5 text-emerald-500" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-white text-xs font-bold tracking-tight">Upload Pass Image</p>
+                          <p className="text-gray-600 text-[8px] uppercase font-black tracking-widest">JPG, PNG, WebP</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* GUIDELINES */}
+                <div className="bg-white/5 rounded-2xl border border-white/5 p-5 relative overflow-hidden group">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <div className="p-1.5 bg-emerald-500/20 rounded-md">
+                      <Shield className="h-3 w-3 text-emerald-400" />
+                    </div>
+                    <span className="text-[9px] font-black text-white uppercase tracking-[0.2em]">Operational Protocol</span>
+                  </div>
+                  <ul className="space-y-2">
+                    {[
+                      'Align QR code within primary focus zone',
+                      'Manual verification for damaged passes',
+                      'Strict window: -15m to +30m from start'
+                    ].map((text, idx) => (
+                      <li key={idx} className="flex items-start text-[10px] text-gray-500 font-medium leading-relaxed">
+                        <div className="mt-1.5 w-1 h-1 bg-emerald-500 rounded-full mr-2 shrink-0"></div>
+                        {text}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* FOOTER STATS */}
+          <div className="mt-6 pt-5 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center space-x-4">
+              <div>
+                <p className="text-[8px] text-gray-600 uppercase tracking-[0.3em] font-black mb-0.5">Verified</p>
+                <div className="flex items-baseline space-x-1.5">
+                   <span className="text-white text-2xl font-black tracking-tighter">{scanCount}</span>
+                   <span className="text-emerald-500 text-[8px] font-black uppercase tracking-widest">Students</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button 
+                onClick={resetScanner}
+                className="flex-1 sm:flex-none px-4 py-3 text-[9px] font-black text-amber-500 hover:text-amber-400 uppercase tracking-[0.2em]"
+              >
+                Flush
+              </button>
+              <button 
+                onClick={onClose}
+                className="flex-1 sm:flex-none px-6 py-3 bg-white text-black hover:bg-gray-200 text-[9px] font-black rounded-xl uppercase tracking-[0.2em] transition-all shadow-xl active:scale-95"
+              >
+                Close Session
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </motion.div>
   );

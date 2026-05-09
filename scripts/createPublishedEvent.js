@@ -10,7 +10,7 @@ const createPublishedEvent = async () => {
       useUnifiedTopology: true,
     });
 
-    console.log('Connected to MongoDB');
+    
 
     // Create a new published event
     const newEvent = new Event({
@@ -69,16 +69,16 @@ const createPublishedEvent = async () => {
     });
 
     await newEvent.save();
-    console.log('✅ Published event created successfully!');
-    console.log('Event ID:', newEvent._id);
-    console.log('Title:', newEvent.title);
-    console.log('Status:', newEvent.status);
+    
+    
+    
+    
 
   } catch (error) {
-    console.error('❌ Error creating event:', error);
+    
   } finally {
     await mongoose.disconnect();
-    console.log('Disconnected from MongoDB');
+    
   }
 };
 

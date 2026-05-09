@@ -15,7 +15,9 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import Profile from './pages/Profile/Profile';
 import ProfileEdit from './pages/Profile/ProfileEdit';
 import Bookings from './pages/Bookings/Bookings';
-import Attendance from './pages/Attendance/Attendance';
+import MyAttendance from './pages/Attendance/MyAttendance';
+import AllAttendance from './pages/Admin/AllAttendance';
+
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import AdminEvents from './pages/Admin/AdminEvents';
 import AdminUsers from './pages/Admin/AdminUsers';
@@ -27,7 +29,6 @@ import AdminSubscription from './components/Admin/AdminSubscription';
 import SubscriptionManager from './components/Subscription/SubscriptionManager';
 import Settings from './pages/Settings/Settings';
 import Payment from './pages/Payment/Payment';
-import FaceTrainingToastTest from './components/Toast/FaceTrainingToastTest';
 // import UserProfileForm from './components/Forms/UserProfileForm';
 import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute';
 import AdminRoute from './components/AdminRoute/AdminRoute';
@@ -41,7 +42,6 @@ import TermsOfService from './pages/TermsOfService/TermsOfService';
 import FAQ from './pages/FAQ/FAQ';
 import EventManagement from './pages/EventManagement/EventManagement';
 import FaceRecognition from './pages/FaceRecognition/FaceRecognition';
-import FaceTest from './pages/FaceTest/FaceTest';
 import PaymentProcessing from './pages/PaymentProcessing/PaymentProcessing';
 import Analytics from './pages/Analytics/Analytics';
 import About from './pages/About/About';
@@ -63,7 +63,6 @@ function App() {
               <Route path="login" element={<Login />} />
               <Route path="register" element={<Register />} />
               <Route path="verify-face" element={<ProtectedRoute><FaceVerify /></ProtectedRoute>} />
-              <Route path="face-test" element={<ProtectedRoute><FaceTest /></ProtectedRoute>} />
               <Route path="verify-email/:token" element={<EmailVerification />} />
               <Route path="verify-email" element={<EmailVerification />} />
               
@@ -87,10 +86,11 @@ function App() {
               
               <Route path="attendance" element={
                 <ProtectedRoute>
-                  <Attendance />
+                  <MyAttendance />
                 </ProtectedRoute>
               } />
               
+
               <Route path="settings" element={
                 <ProtectedRoute>
                   <Settings />
@@ -112,6 +112,12 @@ function App() {
               <Route path="admin/users" element={
                 <AdminRoute>
                   <AdminUsers />
+                </AdminRoute>
+              } />
+              
+              <Route path="admin/attendance" element={
+                <AdminRoute>
+                  <AllAttendance />
                 </AdminRoute>
               } />
               
@@ -178,9 +184,6 @@ function App() {
               <Route path="features/events" element={<EventManagement />} />
               <Route path="features/face-recognition" element={<FaceRecognition />} />
               <Route path="features/payments" element={<PaymentProcessing />} />
-              
-              {/* Test route for face training toasts */}
-              <Route path="test-face-toasts" element={<FaceTrainingToastTest />} />
               
               <Route path="*" element={<NotFound />} />
             </Route>

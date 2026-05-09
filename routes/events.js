@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
     const { category, search, date, page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
 
-    let query = { status: 'published', isActive: true };
+    let query = { status: 'published', isActive: true, 'dateTime.end': { $gte: new Date() } };
     
     if (category) {
       query.category = category;
@@ -53,7 +53,7 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get events error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch events', error: error.message });
   }
 });
@@ -61,13 +61,11 @@ router.get('/', async (req, res) => {
 // Get upcoming events (within 15 minutes) - MUST be before /:id route
 router.get('/upcoming', auth, async (req, res) => {
   try {
-    // Get current time in IST
     const now = new Date();
-    const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
-    const nowIST = new Date(now.getTime() + istOffset);
-    const fifteenMinutesFromNow = new Date(nowIST.getTime() + 15 * 60 * 1000);
+    const fifteenMinutesFromNow = new Date(now.getTime() + 15 * 60 * 1000);
     
     const events = await Event.find({
+      status: 'published',
       isActive: true,
       'dateTime.start': {
         $gte: now,
@@ -79,7 +77,7 @@ router.get('/upcoming', auth, async (req, res) => {
 
     res.json(events);
   } catch (error) {
-    console.error('Get upcoming events error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch upcoming events', error: error.message });
   }
 });
@@ -101,7 +99,7 @@ router.get('/:id', async (req, res) => {
     res.json(event);
 
   } catch (error) {
-    console.error('Get event error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch event', error: error.message });
   }
 });
@@ -122,7 +120,7 @@ router.get('/upcoming/events', async (req, res) => {
     res.json({ events });
 
   } catch (error) {
-    console.error('Get upcoming events error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch upcoming events', error: error.message });
   }
 });
@@ -156,7 +154,7 @@ router.get('/current', auth, async (req, res) => {
     res.json({ events });
 
   } catch (error) {
-    console.error('Get current events error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch current events', error: error.message });
   }
 });
@@ -194,7 +192,7 @@ router.get('/category/:category', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get events by category error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch events by category', error: error.message });
   }
 });
@@ -212,7 +210,7 @@ router.get('/user/bookings', auth, async (req, res) => {
     res.json({ bookings });
 
   } catch (error) {
-    console.error('Get user bookings error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch user bookings', error: error.message });
   }
 });
@@ -241,7 +239,7 @@ router.get('/:id/availability', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Check availability error:', error);
+    
     res.status(500).json({ message: 'Failed to check seat availability', error: error.message });
   }
 });
@@ -287,7 +285,7 @@ router.get('/:id/stats', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get event stats error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch event statistics', error: error.message });
   }
 });
@@ -340,10 +338,34 @@ router.get('/search/query', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Search events error:', error);
+    
     res.status(500).json({ message: 'Failed to search events', error: error.message });
   }
 });
+const upload = require("../middleware/upload");
 
+// CREATE EVENT WITH IMAGE (CLOUDINARY)
+router.post("/create-event", auth, upload.single("image"), async (req, res) => {
+  try {
+    const imageUrl = req.file ? req.file.path : null;
+
+    const event = await Event.create({
+      ...req.body,
+      image: imageUrl
+    });
+
+    res.status(201).json({
+      success: true,
+      event
+    });
+
+  } catch (error) {
+    
+    res.status(500).json({
+      message: "Failed to create event",
+      error: error.message
+    });
+  }
+});
 
 module.exports = router;

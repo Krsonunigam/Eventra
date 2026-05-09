@@ -1,172 +1,174 @@
-const nodemailer = require('nodemailer');
+const sgMail = require("@sendgrid/mail");
 
-// Create transporter
-const transport = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-// Send verification email
-const sendVerificationEmail = async (email, name, token) => {
+const sendBookingConfirmation = async (email, name, event, booking, pdf) => {
   try {
-    const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${token}`;
+    const firstName = name.split(" ")[0];
+
+    const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Booking Confirmed - Eventra</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #050b18; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #ffffff;">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 20px auto; background-color: #0f172a; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+        <!-- Hero Header -->
+        <tr>
+          <td style="position: relative; height: 240px; background: url('${event.image || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=600&q=80'}') center/cover no-repeat;">
+            <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 100%; background: linear-gradient(to top, #0f172a, transparent); padding: 30px; display: flex; align-items: flex-end;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 800; text-shadow: 0 2px 10px rgba(0,0,0,0.5);">${event.title}</h1>
+            </div>
+          </td>
+        </tr>
+        
+        <!-- Content Body -->
+        <tr>
+          <td style="padding: 40px 30px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <div style="display: inline-block; padding: 10px 20px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 50px; color: #22c55e; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px;">
+                Booking Confirmed
+              </div>
+            </div>
+
+            <p style="font-size: 18px; line-height: 1.6; color: #94a3b8; text-align: center; margin-bottom: 40px;">
+              Hey <span style="color: #ffffff; font-weight: 700;">${firstName}</span>, your ticket is secured! Get ready for an incredible experience at ${event.title}.
+            </p>
+
+            <!-- Ticket Details Card -->
+            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 20px; padding: 30px;">
+              <tr>
+                <td style="padding-bottom: 20px;">
+                  <table width="100%">
+                    <tr>
+                      <td width="50%" style="vertical-align: top;">
+                        <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Date & Time</p>
+                        <p style="margin: 5px 0 0; font-size: 14px; font-weight: 600; color: #f1f5f9;">${new Date(event.dateTime.start).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}<br/>${new Date(event.dateTime.start).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
+                      </td>
+                      <td width="50%" style="vertical-align: top; text-align: right;">
+                        <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Location</p>
+                        <p style="margin: 5px 0 0; font-size: 14px; font-weight: 600; color: #f1f5f9;">${event.venue.name}<br/>${event.venue.city}</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="border-top: 1px dashed rgba(255,255,255,0.1); padding: 30px 0; text-align: center;">
+                   <!-- Inline QR Code -->
+                   <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${booking.verificationCode}&color=3b82f6&bgcolor=0f172a" alt="QR Code" style="border: 4px solid rgba(59, 130, 246, 0.3); border-radius: 12px;" />
+                   <p style="margin: 15px 0 0; font-size: 11px; color: #64748b; font-weight: 800; text-transform: uppercase; letter-spacing: 2px;">SCAN FOR ENTRY</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 20px;">
+                  <table width="100%">
+                    <tr>
+                      <td width="50%">
+                        <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Quantity</p>
+                        <p style="margin: 5px 0 0; font-size: 14px; font-weight: 600; color: #f1f5f9;">${booking.quantity} ${booking.quantity > 1 ? 'Tickets' : 'Ticket'}</p>
+                      </td>
+                      <td width="50%" style="text-align: right;">
+                        <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Pass Code</p>
+                        <p style="margin: 5px 0 0; font-size: 18px; font-weight: 900; color: #3b82f6; letter-spacing: 1px;">${booking.verificationCode}</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+
+            <div style="margin-top: 40px; text-align: center;">
+              <a href="https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${new Date(event.dateTime.start).toISOString().replace(/-|:|\.\d\d\d/g, "")}/${new Date(event.dateTime.end || event.dateTime.start).toISOString().replace(/-|:|\.\d\d\d/g, "")}&details=Booking+Code:+${booking.verificationCode}&location=${encodeURIComponent(event.venue.name)}" style="display: inline-block; padding: 14px 30px; background: #3b82f6; border-radius: 12px; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; transition: all 0.3s ease;">Add to Calendar</a>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding: 30px; background: #020617; text-align: center;">
+            <p style="margin: 0; font-size: 18px; font-weight: 900; color: #ffffff; letter-spacing: -0.5px;">EVENTRA<span style="color: #3b82f6;">.</span></p>
+            <p style="margin: 10px 0 0; font-size: 12px; color: #475569;">The future of event management. Built with ❤️ for organizers.</p>
+            <div style="margin-top: 20px;">
+              <a href="#" style="color: #64748b; text-decoration: none; margin: 0 10px; font-size: 12px;">Support</a>
+              <a href="#" style="color: #64748b; text-decoration: none; margin: 0 10px; font-size: 12px;">Terms</a>
+              <a href="#" style="color: #64748b; text-decoration: none; margin: 0 10px; font-size: 12px;">Privacy</a>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+    `;
+
+    const msg = {
+      to: email,
+      from: {
+        email: process.env.EMAIL_FROM || "notifications@eventra.com",
+        name: "Eventra"
+      },
+      subject: `🎟 Confirmed: ${event.title} - Eventra`,
+      html,
+      attachments: pdf ? [
+        {
+          content: pdf.toString("base64"),
+          filename: `ticket-${event.title.replace(/\s+/g, '-').toLowerCase()}.pdf`,
+          type: "application/pdf",
+          disposition: "attachment"
+        }
+      ] : []
+    };
+
+    await sgMail.send(msg);
     
-    const mailOptions = {
-      from: `"Eventra" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: 'Verify Your Eventra Account',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #1a1a1a; color: #ffffff; padding: 20px;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #00d4ff; margin: 0;">Eventra</h1>
-            <p style="color: #888; margin: 5px 0;">Event Management Portal</p>
-          </div>
-          
-          <div style="background: #2a2a2a; padding: 30px; border-radius: 10px; margin-bottom: 20px;">
-            <h2 style="color: #ffffff; margin-top: 0;">Welcome to Eventra, ${name}!</h2>
-            <p style="color: #cccccc; line-height: 1.6;">
-              Thank you for registering with Eventra. To complete your registration and start exploring amazing events, 
-              please verify your email address by clicking the button below.
-            </p>
-            
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${verificationUrl}" 
-                 style="background: linear-gradient(135deg, #00d4ff, #0099cc); 
-                        color: #ffffff; 
-                        padding: 15px 30px; 
-                        text-decoration: none; 
-                        border-radius: 8px; 
-                        display: inline-block; 
-                        font-weight: bold;
-                        box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);">
-                Verify Email Address
-              </a>
-            </div>
-            
-            <p style="color: #888; font-size: 14px; text-align: center;">
-              If the button doesn't work, copy and paste this link into your browser:<br>
-              <a href="${verificationUrl}" style="color: #00d4ff;">${verificationUrl}</a>
-            </p>
-          </div>
-          
-          <div style="text-align: center; color: #888; font-size: 12px;">
-            <p>This verification link will expire in 24 hours.</p>
-            <p>If you didn't create an account with Eventra, please ignore this email.</p>
-          </div>
-        </div>
-      `
-    };
-
-    await transport.sendMail(mailOptions);
-    console.log('Verification email sent successfully');
-  } catch (error) {
-    console.error('Error sending verification email:', error);
-    throw error;
+  } catch (err) {
+    
   }
 };
 
-// Send event notification email
-const sendEventNotification = async (email, name, eventTitle, eventDate, eventVenue) => {
+// Generic event notification for reminders/cancellations
+const sendEventNotification = async (email, name, eventTitle, date, venue) => {
   try {
-    const mailOptions = {
-      from: `"Eventra" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: `Event Reminder: ${eventTitle}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #1a1a1a; color: #ffffff; padding: 20px;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #00d4ff; margin: 0;">Eventra</h1>
-            <p style="color: #888; margin: 5px 0;">Event Management Portal</p>
-          </div>
-          
-          <div style="background: #2a2a2a; padding: 30px; border-radius: 10px; margin-bottom: 20px;">
-            <h2 style="color: #ffffff; margin-top: 0;">Event Reminder</h2>
-            <p style="color: #cccccc; line-height: 1.6;">
-              Hi ${name},<br><br>
-              This is a reminder that you have an upcoming event:
-            </p>
-            
-            <div style="background: #1a1a1a; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="color: #00d4ff; margin-top: 0;">${eventTitle}</h3>
-              <p style="color: #cccccc; margin: 10px 0;"><strong>Date:</strong> ${new Date(eventDate).toLocaleDateString()}</p>
-              <p style="color: #cccccc; margin: 10px 0;"><strong>Venue:</strong> ${eventVenue}</p>
-            </div>
-            
-            <p style="color: #cccccc; line-height: 1.6;">
-              Don't forget to check in at the event venue. We look forward to seeing you there!
-            </p>
-          </div>
-          
-          <div style="text-align: center; color: #888; font-size: 12px;">
-            <p>This is an automated reminder from Eventra.</p>
-          </div>
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <body style="background-color: #050b18; font-family: sans-serif; color: #ffffff; padding: 40px;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: #0f172a; border-radius: 20px; padding: 40px; border: 1px solid rgba(255,255,255,0.05);">
+        <h2 style="color: #3b82f6; margin-top: 0;">Event Update</h2>
+        <p>Hi ${name},</p>
+        <p>We have an update regarding <strong>${eventTitle}</strong>.</p>
+        <div style="background: rgba(255,255,255,0.03); border-radius: 15px; padding: 20px; margin: 20px 0;">
+          <p style="margin: 0; font-size: 14px; color: #94a3b8;">Event Details:</p>
+          <p style="margin: 5px 0; font-weight: bold;">${eventTitle}</p>
+          <p style="margin: 0; font-size: 14px;">${new Date(date).toLocaleString()}</p>
+          <p style="margin: 0; font-size: 14px;">${venue}</p>
         </div>
-      `
+        <p>See you there!</p>
+        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 30px 0;">
+        <p style="font-size: 12px; color: #475569; text-align: center;">Team Eventra</p>
+      </div>
+    </body>
+    </html>
+    `;
+
+    const msg = {
+      to: email,
+      from: {
+        email: process.env.EMAIL_FROM || "notifications@eventra.com",
+        name: "Eventra"
+      },
+      subject: `Update: ${eventTitle} - Eventra`,
+      html
     };
 
-    await transport.sendMail(mailOptions);
-    console.log('Event notification email sent successfully');
-  } catch (error) {
-    console.error('Error sending event notification email:', error);
-    throw error;
+    await sgMail.send(msg);
+    
+  } catch (err) {
+    
   }
 };
 
-// Send booking confirmation email
-const sendBookingConfirmation = async (email, name, eventTitle, bookingReference, seatNumber, totalAmount) => {
-  try {
-    const mailOptions = {
-      from: `"Eventra" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: `Booking Confirmation - ${eventTitle}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #1a1a1a; color: #ffffff; padding: 20px;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #00d4ff; margin: 0;">Eventra</h1>
-            <p style="color: #888; margin: 5px 0;">Event Management Portal</p>
-          </div>
-          
-          <div style="background: #2a2a2a; padding: 30px; border-radius: 10px; margin-bottom: 20px;">
-            <h2 style="color: #ffffff; margin-top: 0;">Booking Confirmed!</h2>
-            <p style="color: #cccccc; line-height: 1.6;">
-              Hi ${name},<br><br>
-              Your booking has been confirmed successfully. Here are the details:
-            </p>
-            
-            <div style="background: #1a1a1a; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="color: #00d4ff; margin-top: 0;">${eventTitle}</h3>
-              <p style="color: #cccccc; margin: 10px 0;"><strong>Booking Reference:</strong> ${bookingReference}</p>
-              <p style="color: #cccccc; margin: 10px 0;"><strong>Seat Number:</strong> ${seatNumber}</p>
-              <p style="color: #cccccc; margin: 10px 0;"><strong>Total Amount:</strong> ₹${totalAmount}</p>
-            </div>
-            
-            <p style="color: #cccccc; line-height: 1.6;">
-              Please keep this confirmation email safe. You'll need it for event check-in.
-            </p>
-          </div>
-          
-          <div style="text-align: center; color: #888; font-size: 12px;">
-            <p>Thank you for choosing Eventra!</p>
-          </div>
-        </div>
-      `
-    };
-
-    await transport.sendMail(mailOptions);
-    console.log('Booking confirmation email sent successfully');
-  } catch (error) {
-    console.error('Error sending booking confirmation email:', error);
-    throw error;
-  }
-};
-
-module.exports = {
-  sendVerificationEmail,
-  sendEventNotification,
-  sendBookingConfirmation
-};
+module.exports = { sendBookingConfirmation, sendEventNotification };

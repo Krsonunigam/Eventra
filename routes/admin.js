@@ -88,7 +88,7 @@ router.get('/dashboard', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get dashboard stats error:', error);
+    
     res.status(500).json({ 
       success: false,
       message: 'Failed to fetch dashboard statistics', 
@@ -129,7 +129,7 @@ router.get('/users/stats', adminAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get user stats error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch user statistics', error: error.message });
   }
 });
@@ -183,7 +183,7 @@ router.get('/users', adminAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get users error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch users', error: error.message });
   }
 });
@@ -215,7 +215,7 @@ router.get('/users/:id', adminAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get user details error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch user details', error: error.message });
   }
 });
@@ -244,7 +244,7 @@ router.put('/users/:id/status', adminAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update user status error:', error);
+    
     res.status(500).json({ message: 'Failed to update user status', error: error.message });
   }
 });
@@ -274,7 +274,7 @@ router.put('/users/:id/verify', adminAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update user verification error:', error);
+    
     res.status(500).json({ message: 'Failed to update user verification', error: error.message });
   }
 });
@@ -283,42 +283,47 @@ router.put('/users/:id/verify', adminAuth, async (req, res) => {
 router.put('/users/:id', adminAuth, async (req, res) => {
   try {
     const { name, email, studentId, institute, phoneNumber, department, gender, role } = req.body;
-    const user = await User.findById(req.params.id);
+    
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      {
+        $set: {
+          ...(name && { name }),
+          ...(email && { email }),
+          ...(studentId && { studentId }),
+          ...(institute && { institute }),
+          ...(phoneNumber && { phoneNumber }),
+          ...(department && { department }),
+          ...(gender && { gender }),
+          ...(role && { role })
+        }
+      },
+      { new: true, runValidators: true }
+    );
 
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Update user fields
-    if (name) user.name = name;
-    if (email) user.email = email;
-    if (studentId) user.studentId = studentId;
-    if (institute) user.institute = institute;
-    if (phoneNumber) user.phoneNumber = phoneNumber;
-    if (department) user.department = department;
-    if (gender) user.gender = gender;
-    if (role) user.role = role;
-
-    await user.save();
-
     res.json({ 
+      success: true,
       message: 'User updated successfully',
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        studentId: user.studentId,
-        institute: user.institute,
-        phoneNumber: user.phoneNumber,
-        department: user.department,
-        gender: user.gender,
-        role: user.role
+        id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        studentId: updatedUser.studentId,
+        institute: updatedUser.institute,
+        phoneNumber: updatedUser.phoneNumber,
+        department: updatedUser.department,
+        gender: updatedUser.gender,
+        role: updatedUser.role
       }
     });
 
   } catch (error) {
-    console.error('Update user error:', error);
-    res.status(500).json({ message: 'Failed to update user', error: error.message });
+    
+    res.status(400).json({ success: false, message: 'Failed to update user', error: error.message });
   }
 });
 
@@ -343,7 +348,7 @@ router.delete('/users/:id', adminAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete user error:', error);
+    
     res.status(500).json({ message: 'Failed to delete user', error: error.message });
   }
 });
@@ -388,7 +393,7 @@ router.post('/users/bulk-action', adminAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Bulk action error:', error);
+    
     res.status(500).json({ message: 'Failed to perform bulk action', error: error.message });
   }
 });
@@ -409,7 +414,7 @@ router.get('/users/export', adminAuth, async (req, res) => {
     res.send(buffer);
 
   } catch (error) {
-    console.error('Export users error:', error);
+    
     res.status(500).json({ message: 'Failed to export users', error: error.message });
   }
 });
@@ -452,7 +457,7 @@ router.get('/events', adminAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get events error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch events', error: error.message });
   }
 });
@@ -460,20 +465,20 @@ router.get('/events', adminAuth, async (req, res) => {
 // Create new event
 router.post('/events', adminAuth, async (req, res) => {
   try {
-    console.log('Creating event with data:', JSON.stringify(req.body, null, 2));
-    console.log('User ID:', req.user.userId);
+    
+    
     
     const eventData = {
       ...req.body,
       organizer: req.user.userId
     };
 
-    console.log('Event data after adding organizer:', JSON.stringify(eventData, null, 2));
+    
 
     const event = new Event(eventData);
     await event.save();
 
-    console.log('Event created successfully:', event._id);
+    
 
     res.status(201).json({
       message: 'Event created successfully',
@@ -481,9 +486,9 @@ router.post('/events', adminAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Create event error:', error);
-    console.error('Error details:', error.message);
-    console.error('Validation errors:', error.errors);
+    
+    
+    
     res.status(500).json({ message: 'Failed to create event', error: error.message });
   }
 });
@@ -499,7 +504,7 @@ router.get('/events/:id', adminAuth, async (req, res) => {
 
     res.json(event);
   } catch (error) {
-    console.error('Get event error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch event', error: error.message });
   }
 });
@@ -507,7 +512,7 @@ router.get('/events/:id', adminAuth, async (req, res) => {
 // Update event
 router.put('/events/:id', adminAuth, async (req, res) => {
   try {
-    console.log('Update event request body:', JSON.stringify(req.body, null, 2));
+    
     
     const event = await Event.findById(req.params.id);
 
@@ -525,14 +530,21 @@ router.put('/events/:id', adminAuth, async (req, res) => {
           event.venue.city = req.body[key].city;
           event.venue.coordinates = req.body[key].coordinates || { latitude: null, longitude: null };
         } else if (key === 'organizer') {
-          // Handle organizer field - could be string or object
-          if (typeof req.body[key] === 'string') {
-            event[key] = new mongoose.Types.ObjectId(req.body[key]);
-          } else if (req.body[key] && req.body[key]._id) {
-            event[key] = new mongoose.Types.ObjectId(req.body[key]._id);
-          } else {
-            event[key] = req.body[key];
+          // Handle organizer field - must be a valid ObjectId
+          let targetId = null;
+          if (typeof req.body[key] === 'string' && mongoose.Types.ObjectId.isValid(req.body[key])) {
+            targetId = new mongoose.Types.ObjectId(req.body[key]);
+          } else if (req.body[key] && req.body[key]._id && mongoose.Types.ObjectId.isValid(req.body[key]._id)) {
+            targetId = new mongoose.Types.ObjectId(req.body[key]._id);
           }
+
+          if (targetId) {
+            event.organizer = targetId;
+          } else if (!event.organizer) {
+            // Fallback to current user if no organizer exists and provided one is invalid
+            event.organizer = req.user.userId;
+          }
+          // If provided is invalid but event already has one, we just keep the existing one
         } else if (key === 'dateTime' && req.body[key]) {
           // Ensure dateTime is properly formatted
           event[key] = {
@@ -555,11 +567,11 @@ router.put('/events/:id', adminAuth, async (req, res) => {
       }
     });
 
-    console.log('Event before save:', JSON.stringify(event, null, 2));
+    
     
     await event.save();
 
-    console.log('Event updated successfully:', event._id);
+    
 
     res.json({
       message: 'Event updated successfully',
@@ -567,9 +579,9 @@ router.put('/events/:id', adminAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update event error:', error);
-    console.error('Error details:', error.message);
-    console.error('Validation errors:', error.errors);
+    
+    
+    
     res.status(500).json({ message: 'Failed to update event', error: error.message });
   }
 });
@@ -596,7 +608,7 @@ router.delete('/events/:id', adminAuth, async (req, res) => {
     res.json({ message: 'Event deleted successfully' });
 
   } catch (error) {
-    console.error('Delete event error:', error);
+    
     res.status(500).json({ message: 'Failed to delete event', error: error.message });
   }
 });
@@ -636,7 +648,7 @@ router.get('/bookings', adminAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get bookings error:', error);
+    
     res.status(500).json({ message: 'Failed to fetch bookings', error: error.message });
   }
 });
@@ -655,7 +667,7 @@ router.get('/export/users', adminAuth, async (req, res) => {
     res.send(excelBuffer);
 
   } catch (error) {
-    console.error('Export users error:', error);
+    
     res.status(500).json({ message: 'Failed to export users', error: error.message });
   }
 });
@@ -674,7 +686,7 @@ router.get('/export/events', adminAuth, async (req, res) => {
     res.send(excelBuffer);
 
   } catch (error) {
-    console.error('Export events error:', error);
+    
     res.status(500).json({ message: 'Failed to export events', error: error.message });
   }
 });
@@ -710,7 +722,7 @@ router.post('/notifications/send', adminAuth, async (req, res) => {
           );
         } else if (type === 'whatsapp') {
           // WhatsApp notification logic would go here
-          console.log(`WhatsApp notification sent to ${booking.user.phoneNumber}`);
+          
         }
         sentCount++;
       } catch (error) {
@@ -729,7 +741,7 @@ router.post('/notifications/send', adminAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Send notifications error:', error);
+    
     res.status(500).json({ message: 'Failed to send notifications', error: error.message });
   }
 });
