@@ -4,29 +4,29 @@ Eventra is a premium, high-performance event management platform built with the 
 
 ![Eventra Logo](logo.png)
 
-## 🌟 Key Features
+##  Key Features
 
-### 🤖 Advanced Face Recognition
+###  Advanced Face Recognition
 - **Biometric Check-in**: High-accuracy face recognition using `face-api.js` and `canvas`.
 - **Anti-Spoofing**: Secure attendance marking with live verification.
 - **Auto-Sync**: Attendance records automatically update across User and Admin dashboards.
 
-### 💳 Secure Payments & Booking
+### Secure Payments & Booking
 - **Razorpay Integration**: Seamless and secure payment gateway for ticket bookings.
 - **Seat Selection**: Interactive seat selection UI for venue-based events.
 - **Digital Tickets**: Secure, non-transferable tickets with diagonal watermarks and QR codes.
 
-### 📊 Admin Powerhouse
+###  Admin Powerhouse
 - **Dynamic Dashboards**: Real-time analytics on attendance, revenue, and user growth.
 - **Export Capabilities**: Generate professional Excel and PDF reports in one click.
 - **Event Controls**: Complete lifecycle management from creation to post-event reporting.
 
-### 💬 Intelligent Interaction
+###  Intelligent Interaction
 - **AI Chatbot**: Responsive assistant with drag-and-drop capability for quick support.
 - **WhatsApp Notifications**: Automated booking confirmations and reminders via WhatsApp.
 - **Email System**: Transactional emails for registration and password resets.
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 - **Frontend**: React 18, Framer Motion, Tailwind CSS, Lucide Icons, Axios.
 - **Backend**: Node.js, Express, MongoDB (Mongoose), JWT, Socket.io.
@@ -35,7 +35,7 @@ Eventra is a premium, high-performance event management platform built with the 
 
 ---
 
-## 🚀 Deployment Guide
+##  Deployment Guide
 
 For a full step-by-step production deployment guide, see [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md).
 
@@ -56,7 +56,7 @@ For a full step-by-step production deployment guide, see [DEPLOYMENT_GUIDE.md](D
 
 ---
 
-## 📦 Local Setup
+##  Local Setup
 
 1. **Clone the repository**:
    ```bash
@@ -83,16 +83,16 @@ For a full step-by-step production deployment guide, see [DEPLOYMENT_GUIDE.md](D
 
 ---
 
-## 🛡️ Security
+##  Security
 - **JWT Authentication**: Secure stateless auth.
 - **Input Sanitization**: Protection against XSS and NoSQL injection.
 - **Rate Limiting**: API protection against brute force.
 
-## 🤝 Contributing
+##  Contributing
 Contributions are welcome! Please fork the repo and submit a PR.
 
 ## 📝 License
 Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
-Built with ❤️ by the Eventra Team.
+Built by the Eventra Team.
