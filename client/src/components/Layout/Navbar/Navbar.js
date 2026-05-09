@@ -39,6 +39,7 @@ const Navbar = () => {
   };
 
   const navItems = useMemo(() => [
+    { name: 'Events', path: '/events', icon: Calendar, mobileOnly: true },
     { name: 'Admin Registration', path: '/admin/subscription', icon: Crown, highlight: true },
   ], []);
 
@@ -89,7 +90,7 @@ const Navbar = () => {
 
           {/* Center - Desktop navigation */}
           <div className="hidden md:flex items-center space-x-2">
-            {navItems.map((item) => (
+            {navItems.filter(item => !item.mobileOnly).map((item) => (
               item.external ? (
                 <a
                   key={item.name}
@@ -279,6 +280,15 @@ const Navbar = () => {
               <span>{item.name}</span>
             </Link>
           ))}
+          
+            <Link
+              to="/contact"
+              className="block px-4 py-3 rounded-xl text-base font-medium text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-300 flex items-center space-x-3"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <Phone className="h-5 w-5" />
+              <span>Contact Us</span>
+            </Link>
           </div>
 
           {/* Certificate Verification Mobile */}
