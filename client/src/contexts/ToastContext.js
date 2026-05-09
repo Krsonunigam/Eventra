@@ -17,7 +17,7 @@ export const ToastProvider = ({ children }) => {
     toast.custom((t) => (
       <CustomToast t={t} message={message} type={type} title={options.title} style={options.style} />
     ), {
-      duration: options.duration || 2500,
+      duration: options.duration || 3000,
       position: options.position || 'top-center',
       ...options,
     });
@@ -66,7 +66,7 @@ export const ToastProvider = ({ children }) => {
           alignItems: 'flex-start',
         }}
         toastOptions={{
-          duration: 2500,
+          duration: 3000,
           style: {
             background: 'transparent',
             color: 'transparent',

@@ -135,16 +135,36 @@ const AdminMessages = () => {
               />
             </form>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-white/5 border border-white/10 rounded-2xl px-6 py-3 text-sm focus:outline-none focus:border-cyan-500/50"
-            >
-              <option value="">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="ongoing">Ongoing</option>
-              <option value="resolved">Resolved</option>
-            </select>
+            <div className="relative group">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className={`appearance-none bg-white/5 border-2 rounded-2xl pl-8 pr-14 py-4 text-sm font-black uppercase tracking-[0.2em] focus:outline-none focus:ring-4 focus:ring-cyan-500/10 cursor-pointer transition-all shadow-2xl ${
+                  statusFilter === 'pending' ? 'text-amber-500 border-amber-500/50 bg-amber-500/10' :
+                  statusFilter === 'ongoing' ? 'text-blue-500 border-blue-500/50 bg-blue-500/10' :
+                  statusFilter === 'resolved' ? 'text-emerald-500 border-emerald-500/50 bg-emerald-500/10' :
+                  'text-gray-400 border-white/10 hover:border-white/20'
+                }`}
+              >
+                <option value="" className="bg-gray-900 text-gray-400">Filter By Status</option>
+                <option value="pending" className="bg-gray-900 text-amber-500">● PENDING TICKETS</option>
+                <option value="ongoing" className="bg-gray-900 text-blue-500">● ONGOING TICKETS</option>
+                <option value="resolved" className="bg-gray-900 text-emerald-500">● RESOLVED TICKETS</option>
+              </select>
+              <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-cyan-500 group-hover:scale-110 transition-transform">
+                <Filter className="h-5 w-5" />
+              </div>
+            </div>
+            
+            {statusFilter && (
+              <button 
+                onClick={() => setStatusFilter('')}
+                className="p-3 bg-red-500/10 text-red-500 border border-red-500/20 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-lg"
+                title="Clear Filter"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
