@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import ContactForm from '../../components/Forms/ContactForm';
 import { 
   // Calendar, 
   // Users, 
@@ -638,44 +639,89 @@ const Home = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-cyan-500 to-blue-600">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            Ready to Get Started?
-          </h2>
-          <p className="text-xl text-cyan-100 mb-8 max-w-2xl mx-auto">
-            Join thousands of users who are already using Eventra to manage their events
-          </p>
-          {/* Demo Video */}
-          <div className="max-w-4xl mx-auto mb-10">
-            <div className="w-full bg-black rounded-xl overflow-hidden shadow-lg">
-              <iframe
-                src="https://drive.google.com/file/d/1qc24U4erMZ9RMDj73XBs57M6Nyg5V0tn/preview"
-                allow="autoplay"
-                className="w-full h-[220px] sm:h-[280px] md:h-[360px] lg:h-[420px]"
-                title="Eventra Demo Video"
-              />
-            </div>
+      {/* Contact Section */}
+      <section className="py-24 bg-slate-950 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full opacity-20 pointer-events-none">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/30 blur-[120px] rounded-full" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/30 blur-[120px] rounded-full" />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+            >
+              <h2 className="text-4xl md:text-5xl font-black text-white mb-6 uppercase italic tracking-tighter leading-tight">
+                Have an <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Event</span> in Mind?
+              </h2>
+              <p className="text-xl text-gray-400 mb-8 leading-relaxed">
+                Whether you're planning a massive tech conference, a local workshop, or a music festival, Eventra provides the tools to make it legendary.
+              </p>
+              
+              <div className="space-y-6 mb-10">
+                {[
+                  { title: "24/7 Support", desc: "Our team is always here to help you scale." },
+                  { title: "Custom Integration", desc: "Need something specific? Let's build it." },
+                  { title: "Fast Onboarding", desc: "Get your event live in minutes, not days." }
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-4 items-start">
+                    <div className="h-6 w-6 rounded-full bg-blue-500/20 border border-blue-500/50 flex items-center justify-center shrink-0 mt-1">
+                      <div className="h-2 w-2 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-white text-lg mb-1">{item.title}</h4>
+                      <p className="text-gray-500 text-sm">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-6">
+                {!isAuthenticated ? (
+                  <Link
+                    to="/register"
+                    className="px-8 py-4 bg-white text-black font-black uppercase tracking-widest rounded-2xl hover:bg-cyan-400 hover:scale-105 transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)]"
+                  >
+                    Start for Free
+                  </Link>
+                ) : (
+                  <Link
+                    to="/admin/events"
+                    className="px-8 py-4 bg-blue-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-blue-500 hover:scale-105 transition-all shadow-[0_0_40px_rgba(37,99,235,0.2)]"
+                  >
+                    Manage Events
+                  </Link>
+                )}
+                <Link
+                  to="/events"
+                  className="px-8 py-4 bg-white/5 border border-white/10 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-white/10 transition-all"
+                >
+                  Browse Events
+                </Link>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+              className="bg-white/5 backdrop-blur-3xl border border-white/10 rounded-[3rem] p-10 shadow-2xl relative"
+            >
+              <div className="absolute -top-10 -right-10 w-32 h-32 bg-cyan-500/20 blur-3xl rounded-full" />
+              <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-blue-500/20 blur-3xl rounded-full" />
+              
+              <div className="mb-8">
+                <h3 className="text-2xl font-black text-white uppercase italic tracking-widest mb-2">Send us a Message</h3>
+                <div className="h-1 w-20 bg-gradient-to-r from-cyan-400 to-blue-600 rounded-full" />
+              </div>
+
+              <ContactForm />
+            </motion.div>
           </div>
-          {!isAuthenticated && (
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                to="/register"
-                onClick={() => localStorage.removeItem('redirectAfterVerification')}
-                className="inline-flex items-center px-8 py-4 bg-white text-cyan-600 font-semibold rounded-lg hover:bg-gray-100 transition-all duration-200 transform hover:scale-105"
-              >
-                Create Account
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-              <Link
-                to="/events"
-                className="inline-flex items-center px-8 py-4 border-2 border-white text-white font-semibold rounded-lg hover:bg-white hover:text-cyan-600 transition-all duration-200"
-              >
-                Browse Events
-              </Link>
-            </div>
-          )}
         </div>
       </section>
     </div>
