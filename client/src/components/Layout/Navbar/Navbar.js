@@ -290,14 +290,48 @@ const Navbar = () => {
             </Link>
           ))}
           
-          <Link
-            to="/contact"
-            className="block px-4 py-3 rounded-xl text-base font-medium text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-300 flex items-center space-x-3"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <Phone className="h-5 w-5" />
-            <span>Contact Us</span>
-          </Link>
+            <Link
+              to="/contact"
+              className="block px-4 py-3 rounded-xl text-base font-medium text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-300 flex items-center space-x-3"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <Phone className="h-5 w-5" />
+              <span>Contact Us</span>
+            </Link>
+          </div>
+
+          {/* Certificate Verification Mobile */}
+          <div className="px-4 py-4 mb-6 bg-white/5 rounded-2xl border border-white/10 shadow-inner">
+            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Certificate Verification</p>
+            <div className="flex items-center">
+              <input
+                type="text"
+                id="mobile-nav-cert-id"
+                placeholder="Enter ID"
+                className="flex-1 px-3 py-2.5 bg-[#0a0a0a] border border-white/10 rounded-l-xl text-white text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500 placeholder:text-gray-600"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    const id = e.target.value.trim();
+                    if (id) {
+                      navigate(`/verify-certificate?id=${id}`);
+                      setMobileMenuOpen(false);
+                    }
+                  }
+                }}
+              />
+              <button
+                onClick={() => {
+                  const id = document.getElementById('mobile-nav-cert-id').value.trim();
+                  if (id) {
+                    navigate(`/verify-certificate?id=${id}`);
+                    setMobileMenuOpen(false);
+                  }
+                }}
+                className="px-4 py-2.5 bg-gradient-to-r from-cyan-400 to-blue-500 text-black font-bold text-sm rounded-r-xl shadow-[0_0_15px_rgba(34,211,238,0.3)]"
+              >
+                Verify
+              </button>
+            </div>
           </div>
           
           {isAuthenticated ? (
