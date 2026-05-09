@@ -22,7 +22,7 @@ const EmailVerification = () => {
 
   const verifyEmail = useCallback(async (verificationToken) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/email/verify?token=${verificationToken}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/email/verify?token=${verificationToken}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +59,7 @@ const EmailVerification = () => {
       const email = prompt('Enter your email address to resend verification:');
       if (!email) return;
 
-      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/email/send-verification`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/email/send-verification`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
