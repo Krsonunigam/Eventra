@@ -55,14 +55,17 @@ import MyCertificates from './pages/Certification/MyCertificates';
 import CertificateVerify from './pages/Certification/CertificateVerify';
 import AdminCertificates from './pages/Admin/AdminCertificates';
 
+import ScrollToTop from './components/ScrollToTop';
+
 function App() {
   return (
     <ThemeProvider>
-      <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID}>
+      <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID || "385720505686-qr47isp4vu1s1f8n2q9nvvjd15rmem6l.apps.googleusercontent.com"}>
         <AuthProvider>
         <ToastProvider>
-          <div className="App">
-          <Routes>
+          <div className="min-h-screen bg-gray-900">
+            <ScrollToTop />
+            <Routes>
             <Route path="/" element={<Layout />}>
               <Route index element={<Home />} />
               <Route path="events" element={<Events />} />

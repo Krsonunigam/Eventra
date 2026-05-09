@@ -290,7 +290,7 @@ const AdminAnalytics = () => {
           <StatCard
             title="Revenue"
             value={`₹${analyticsData.overview?.totalRevenue?.toLocaleString() || '0'}`}
-            icon={DollarSign}
+            // icon={DollarSign}
             color="yellow"
           />
           <StatCard

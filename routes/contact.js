@@ -9,6 +9,7 @@ const { notifyAdminOfContact } = require('../utils/emailService');
 router.post('/', async (req, res) => {
   try {
     const { name, email, subject, message } = req.body;
+    console.log(`📩 New Contact Submission: [${name}] [${email}] - Subject: ${subject}`);
 
     if (!name || !email || !subject || !message) {
       return res.status(400).json({ success: false, message: 'All fields are required' });

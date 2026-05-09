@@ -814,14 +814,14 @@ router.post('/notifications/send', adminAuth, async (req, res) => {
   }
 });
 
+const JSZip = require('jszip');
 const Contact = require('../models/Contact');
-
-// ... existing routes ...
 
 // Get all contact messages
 router.get('/contacts', adminAuth, async (req, res) => {
   try {
     const { status, search, page = 1, limit = 20 } = req.query;
+    console.log(`🔍 Admin fetching contacts: status=${status || 'all'}, search=${search || 'none'}`);
     
     let query = {};
     if (status) query.status = status;
@@ -873,6 +873,71 @@ router.put('/contacts/:id/status', adminAuth, async (req, res) => {
     res.json({ success: true, contact });
   } catch (error) {
     res.status(500).json({ message: 'Failed to update status', error: error.message });
+  }
+});
+
+// Bulk download certificates for an event
+router.get('/events/:id/bulk-certificates', adminAuth, async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const event = await Event.findById(eventId);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    // Find all confirmed bookings
+    const bookings = await Booking.find({ event: eventId, status: 'confirmed' }).populate('user');
+    
+    if (bookings.length === 0) {
+      return res.status(400).json({ message: 'No confirmed bookings found for this event' });
+    }
+
+    const zip = new JSZip();
+    const generator = new CertificateGenerator();
+    let generatedCount = 0;
+
+    for (const booking of bookings) {
+      // Check for attendance
+      const attendance = await Attendance.findOne({ event: eventId, user: booking.user._id, status: 'present' });
+      
+      // We only generate for those who were present if the event is strictly attendance-based
+      // But for bulk, let's include anyone who has a certificate record or was present
+      let certificate = await Certificate.findOne({ event: eventId, user: booking.user._id });
+      
+      if (!certificate && !attendance) continue;
+
+      if (!certificate) {
+          // Create temporary certificate data if not in DB but attended
+          certificate = {
+              certificateId: `CERT-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+              verificationCode: Math.random().toString(36).substr(2, 12).toUpperCase(),
+              issuedDate: new Date()
+          };
+      }
+
+      try {
+        const pdfBuffer = await generator.generateCertificate(certificate, booking.user, event, attendance);
+        zip.file(`${booking.user.name.replace(/[^a-z0-9]/gi, '_')}_Certificate.pdf`, pdfBuffer);
+        generatedCount++;
+      } catch (err) {
+        console.error(`Error generating certificate for ${booking.user.name}:`, err.message);
+      }
+    }
+
+    if (generatedCount === 0) {
+      return res.status(400).json({ message: 'No certificates could be generated (none present or no certificate records)' });
+    }
+
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+    
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename=Certificates_${event.title.replace(/[^a-z0-9]/gi, '_')}.zip`,
+      'Content-Length': zipBuffer.length
+    });
+
+    res.send(zipBuffer);
+  } catch (error) {
+    console.error('Bulk certificate generation error:', error);
+    res.status(500).json({ message: 'Failed to generate bulk certificates', error: error.message });
   }
 });
 

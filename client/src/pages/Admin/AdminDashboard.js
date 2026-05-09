@@ -356,8 +356,37 @@ const AdminDashboard = () => {
                     <div className="flex-1">
                       <p className="text-white text-sm font-medium">{event.title}</p>
                     </div>
-                    <div className="text-gray-400 text-xs">
-                      {formatDate(event.dateTime.start)}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          try {
+                            toast.info('Generating bulk certificates, please wait...');
+                            const response = await api.get(`/api/admin/events/${event._id}/bulk-certificates`, {
+                              responseType: 'blob'
+                            });
+                            const blob = new Blob([response.data], { type: 'application/zip' });
+                            const url = window.URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = `Certificates_${event.title.replace(/[^a-z0-9]/gi, '_')}.zip`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            window.URL.revokeObjectURL(url);
+                            toast.success('Bulk certificates downloaded successfully!');
+                          } catch (error) {
+                            toast.error('Failed to download bulk certificates');
+                          }
+                        }}
+                        className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-yellow-400 transition-colors"
+                        title="Bulk Download Certificates"
+                      >
+                        <Award className="h-4 w-4" />
+                      </button>
+                      <div className="text-gray-400 text-xs">
+                        {formatDate(event.dateTime.start)}
+                      </div>
                     </div>
                   </div>
                 ))
