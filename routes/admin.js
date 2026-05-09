@@ -814,4 +814,66 @@ router.post('/notifications/send', adminAuth, async (req, res) => {
   }
 });
 
+const Contact = require('../models/Contact');
+
+// ... existing routes ...
+
+// Get all contact messages
+router.get('/contacts', adminAuth, async (req, res) => {
+  try {
+    const { status, search, page = 1, limit = 20 } = req.query;
+    
+    let query = {};
+    if (status) query.status = status;
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { subject: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const contacts = await Contact.find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Contact.countDocuments(query);
+
+    res.json({
+      success: true,
+      contacts,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      totalMessages: total
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch contacts', error: error.message });
+  }
+});
+
+// Update contact status
+router.put('/contacts/:id/status', adminAuth, async (req, res) => {
+  try {
+    const { status, adminNotes } = req.body;
+    const updateData = { status };
+    if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
+    if (status === 'resolved') updateData.resolvedAt = new Date();
+
+    const contact = await Contact.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    );
+
+    if (!contact) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+
+    res.json({ success: true, contact });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update status', error: error.message });
+  }
+});
+
 module.exports = router;

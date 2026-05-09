@@ -27,6 +27,7 @@ import AdminReports from './pages/Admin/AdminReports';
 import AdminAnalytics from './pages/Admin/AdminAnalytics';
 import EventCreate from './pages/Admin/EventCreate';
 import EventEdit from './pages/Admin/EventEdit';
+import AdminMessages from './pages/Admin/AdminMessages';
 import AdminSubscription from './components/Admin/AdminSubscription';
 import SubscriptionManager from './components/Subscription/SubscriptionManager';
 import Settings from './pages/Settings/Settings';
@@ -131,6 +132,12 @@ function App() {
               <Route path="admin/reports" element={
                 <AdminRoute>
                   <AdminReports />
+                </AdminRoute>
+              } />
+              
+              <Route path="admin/messages" element={
+                <AdminRoute>
+                  <AdminMessages />
                 </AdminRoute>
               } />
               

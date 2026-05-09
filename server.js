@@ -146,6 +146,7 @@ app.use('/api/pure-face', require('./routes/pureNodeFace'));
 app.use('/api/email', require('./routes/emailVerification'));
 app.use('/api/upload', require('./routes/upload'));
 app.use('/api/certificates', require('./routes/certificates'));
+app.use('/api/contact', require('./routes/contact'));
 
 
 // Health check route for production monitoring

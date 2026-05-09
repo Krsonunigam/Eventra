@@ -364,4 +364,83 @@ const sendCertificateEmail = async (email, name, eventTitle, certificateId, veri
   }
 };
 
-module.exports = { sendBookingConfirmation, sendEventNotification, sendResetOTP, sendCertificateEmail };
+const notifyAdminOfContact = async (contactData) => {
+  try {
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #e1e8ed; }
+        .header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: #ffffff; padding: 30px 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+        .badge { display: inline-block; padding: 4px 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-top: 10px; }
+        .content { padding: 40px 30px; }
+        .info-grid { display: grid; grid-template-columns: 1fr; gap: 20px; margin-bottom: 30px; }
+        .info-item { padding-bottom: 15px; border-bottom: 1px solid #f0f4f8; }
+        .label { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+        .value { font-size: 15px; font-weight: 600; color: #1e293b; }
+        .message-box { background-color: #f8fafc; border-radius: 8px; padding: 20px; border-left: 4px solid #3b82f6; margin-top: 20px; }
+        .message-box p { margin: 0; line-height: 1.6; color: #475569; white-space: pre-wrap; }
+        .footer { background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e1e8ed; }
+        .btn { display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; margin-top: 10px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>New Inquiry Received</h1>
+          <div class="badge">Eventra Support</div>
+        </div>
+        <div class="content">
+          <div class="info-grid">
+            <div class="info-item">
+              <div class="label">From</div>
+              <div class="value">${contactData.name} (${contactData.email})</div>
+            </div>
+            <div class="info-item">
+              <div class="label">Subject</div>
+              <div class="value">${contactData.subject}</div>
+            </div>
+            <div class="info-item">
+              <div class="label">Message</div>
+              <div class="message-box">
+                <p>${contactData.message}</p>
+              </div>
+            </div>
+          </div>
+          <div style="text-align: center;">
+            <a href="${process.env.CLIENT_URL}/admin/messages" class="btn">View in Admin Panel</a>
+          </div>
+        </div>
+        <div class="footer">
+          <p style="margin: 0; font-size: 12px; color: #94a3b8;">&copy; ${new Date().getFullYear()} Eventra. New Inquiry Alert System.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+    `;
+
+    const transporter = createNodemailerTransporter();
+    await transporter.sendMail({
+      from: `"Eventra Admin Alert" <${process.env.EMAIL_USER}>`,
+      to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER,
+      subject: `New Message: ${contactData.subject}`,
+      html
+    });
+
+    return true;
+  } catch (error) {
+    console.error("Admin contact notification error:", error.message);
+    return false;
+  }
+};
+
+module.exports = { 
+  sendBookingConfirmation, 
+  sendEventNotification, 
+  sendResetOTP, 
+  sendCertificateEmail,
+  notifyAdminOfContact 
+};

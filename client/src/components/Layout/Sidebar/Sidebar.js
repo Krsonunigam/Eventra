@@ -11,7 +11,8 @@ import {
   Settings,
   Activity,
   FileText,
-  UserCheck
+  UserCheck,
+  MessageSquare
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -42,6 +43,7 @@ const Sidebar = () => {
     { name: 'Attendance', path: '/admin/attendance', icon: UserCheck },
     { name: 'Analytics', path: '/admin/analytics', icon: Activity },
     { name: 'Reports', path: '/admin/reports', icon: FileText },
+    { name: 'Messages', path: '/admin/messages', icon: MessageSquare },
     { name: 'Settings', path: '/settings', icon: Settings },
   ];
 
