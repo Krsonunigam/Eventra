@@ -142,9 +142,9 @@ const Register = () => {
           transition={{ duration: 0.8, ease: "easeOut" }}
           className="text-center relative z-10"
         >
-          <div className="inline-block p-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-white/10 mb-6">
+          {/* <div className="inline-block p-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-white/10 mb-6">
             <GraduationCap className="h-10 w-10 text-blue-400" />
-          </div>
+          </div> */}
           <h2 className="text-4xl font-black text-white tracking-tight">
             Join the Ecosystem
           </h2>
