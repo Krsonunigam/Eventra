@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd client && npm install && npm run build",
+  "buildCommand": "npm run build",
   "outputDirectory": "client/build",
-  "installCommand": "npm install",
+  "installCommand": "cd client && npm install",
   "framework": null,
   "env": {
     "CI": "false",
