@@ -44,12 +44,12 @@ venv.bak/
 pip-wheel-metadata/
 *.egg
 
-# Environment / secrets
+# Environment / secrets — keep actual secrets out of git
 .env
 .env.local
-.env.*
-.env.example
 .env.test
+.env.development
+# NOTE: .env.production is intentionally NOT ignored — it contains build flags, not secrets.
 secrets.*
 credentials.json
 *.pem
