@@ -26,6 +26,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/axiosConfig';
 import { formatDateIST, formatTimeIST, formatDateTimeIST } from '../../utils/timezoneUtils';
+import { CATEGORY_IMAGES } from '../../utils/imageConstants';
 
 const Home = () => {
   const { isAuthenticated } = useAuth();
@@ -230,15 +231,18 @@ const Home = () => {
                   className="bg-gray-900 rounded-xl border border-gray-700 hover:border-cyan-500 transition-all duration-300 overflow-hidden group cursor-pointer"
                   onClick={() => handleEventClick(event._id)}
                 >
-                  {event.image && (
-                    <div className="h-48 overflow-hidden">
-                      <img
-                        src={event.image}
-                        alt={event.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-                  )}
+                  <div className="h-48 overflow-hidden">
+                    <img
+                      src={event.image || CATEGORY_IMAGES[event.category] || CATEGORY_IMAGES.Default}
+                      alt={event.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        if (e.target.src !== CATEGORY_IMAGES.Default) {
+                          e.target.src = CATEGORY_IMAGES.Default;
+                        }
+                      }}
+                    />
+                  </div>
                   
                   <div className="p-6">
                     <div className="flex items-center justify-between mb-3">

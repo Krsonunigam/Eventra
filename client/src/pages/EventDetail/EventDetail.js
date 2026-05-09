@@ -19,6 +19,7 @@ import {
 import api from '../../utils/axiosConfig';
 import { useAuth } from '../../contexts/AuthContext';
 import useCustomToast from '../../utils/customToast';
+import { CATEGORY_IMAGES } from '../../utils/imageConstants';
 
 const EventDetail = () => {
   const toast = useCustomToast();
@@ -191,10 +192,10 @@ const EventDetail = () => {
           className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden mb-8"
         >
           {/* Event Image */}
-          {event.image && (
+          {true && (
             <div className="h-64 bg-gray-700 flex items-center justify-center">
               <img
-                src={event.image}
+                src={event.image || CATEGORY_IMAGES[event.category] || CATEGORY_IMAGES.Default}
                 alt={event.title}
                 className="w-full h-full object-cover"
               />

@@ -3,10 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, X, Send, Bot, User } from 'lucide-react';
 import api from '../../utils/axiosConfig';
 import useCustomToast from '../../utils/customToast';
+import { useAuth } from '../../contexts/AuthContext';
 import './Chatbot.css';
 
 const Chatbot = () => {
   const toast = useCustomToast();
+  const { user, isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     {
@@ -114,7 +116,7 @@ const Chatbot = () => {
         className="chatbot-fab"
         aria-label="Open chat assistant"
       >
-        <MessageCircle className="h-6 w-6" />
+        <img src="/eventra-logo.svg" alt="Eventra Assistant" className="h-7 w-7" />
       </motion.button>
 
       {/* Chatbot Modal */}
@@ -140,8 +142,8 @@ const Chatbot = () => {
               {/* Header */}
               <div className="chatbot-header">
                 <div className="chatbot-header-info">
-                  <div className="chatbot-avatar">
-                    <Bot className="h-5 w-5 text-white" />
+                  <div className="chatbot-avatar bg-white/20 p-1">
+                    <img src="/eventra-logo.svg" alt="AI" className="h-full w-full" />
                   </div>
                   <div>
                     <h3 className="chatbot-title">Eventra Assistant</h3>
@@ -165,25 +167,21 @@ const Chatbot = () => {
                     className={`chatbot-message-row ${message.sender === 'user' ? 'row-user' : 'row-bot'}`}
                   >
                     <div className={`chatbot-bubble-wrap ${message.sender === 'user' ? 'wrap-user' : 'wrap-bot'}`}>
-                      <div className={`chatbot-avatar-sm ${message.sender === 'user' ? 'avatar-user' : 'avatar-bot'}`}>
+                      <div className={`chatbot-avatar-sm overflow-hidden ${message.sender === 'user' ? 'avatar-user' : 'avatar-bot bg-white/10 p-1'}`}>
                         {message.sender === 'user'
-                          ? <User className="h-4 w-4 text-white" />
-                          : <Bot className="h-4 w-4 text-white" />
+                          ? (user?.profilePicture 
+                              ? <img src={user.profilePicture} alt="You" className="h-full w-full object-cover" />
+                              : <User className="h-4 w-4 text-white" />
+                            )
+                          : <img src="/eventra-logo.svg" alt="AI" className="h-full w-full" />
                         }
                       </div>
                       <div className={`chatbot-bubble ${message.sender === 'user' ? 'bubble-user' : 'bubble-bot'}`}>
                         <p className="chatbot-text">{message.text}</p>
 
-                        {message.sender === 'bot' && (message.category || message.confidence) && (
+                        {message.sender === 'bot' && message.category && (
                           <div className="chatbot-meta">
-                            {message.category && (
-                              <span className="chatbot-category">{message.category}</span>
-                            )}
-                            {message.confidence && (
-                              <span className="chatbot-confidence">
-                                {Math.round(message.confidence * 100)}% confident
-                              </span>
-                            )}
+                            <span className="chatbot-category">{message.category}</span>
                           </div>
                         )}
 
@@ -208,8 +206,8 @@ const Chatbot = () => {
                 {isLoading && (
                   <div className="chatbot-message-row row-bot">
                     <div className="chatbot-bubble-wrap wrap-bot">
-                      <div className="chatbot-avatar-sm avatar-bot">
-                        <Bot className="h-4 w-4 text-white" />
+                      <div className="chatbot-avatar-sm avatar-bot bg-white/10 p-1">
+                        <img src="/eventra-logo.svg" alt="AI" className="h-full w-full" />
                       </div>
                       <div className="chatbot-bubble bubble-bot">
                         <div className="chatbot-typing">

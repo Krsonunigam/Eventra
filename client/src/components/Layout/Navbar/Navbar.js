@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, User, LogOut, Settings, Calendar, Users, BarChart3, PanelLeft, Crown, Phone, Award, LogIn, CheckCircle } from 'lucide-react';
+import { Menu, X, User, LogOut, Settings, Calendar, Users, BarChart3, PanelLeft, Crown, Phone, Award, LogIn, CheckCircle, Search, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useTheme } from '../../../contexts/ThemeContext';
 
@@ -125,26 +125,31 @@ const Navbar = () => {
             {/* Certificate Verification Quick Link */}
             <div className="flex items-center ml-4 pl-4 border-l border-white/10">
               <div className="flex items-center">
-                <input
-                  type="text"
-                  id="nav-cert-id"
-                  placeholder="Verify Certificate ID"
-                  className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-l-lg text-white text-xs focus:outline-none focus:ring-1 focus:ring-cyan-500 w-40 placeholder:text-gray-500"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      const id = e.target.value.trim();
-                      if (id) navigate(`/verify-certificate?id=${id}`);
-                    }
-                  }}
-                />
+                <div className="relative group">
+                  <input
+                    type="text"
+                    id="nav-cert-id"
+                    placeholder="Verify Certificate ID..."
+                    className="pl-9 pr-3 py-2 bg-gray-900/40 border border-white/10 rounded-l-xl text-white text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:bg-gray-900/60 transition-all duration-300 w-44 placeholder:text-gray-500"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        const id = e.target.value.trim();
+                        if (id) navigate(`/verify-certificate?id=${id}`);
+                      }
+                    }}
+                  />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-cyan-400 transition-colors">
+                    <Search className="h-4 w-4" />
+                  </div>
+                </div>
                 <button
                   onClick={() => {
                     const id = document.getElementById('nav-cert-id').value.trim();
                     if (id) navigate(`/verify-certificate?id=${id}`);
                   }}
-                  className="px-3 py-1.5 bg-gradient-to-r from-cyan-400 to-blue-500 text-black font-bold text-xs rounded-r-lg hover:from-cyan-500 hover:to-blue-600 transition-all shadow-[0_0_15px_rgba(34,211,238,0.3)]"
+                  className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white p-2 rounded-r-xl transition-all duration-300 shadow-lg shadow-cyan-500/20"
                 >
-                  Verify
+                  <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
             </div>
@@ -292,24 +297,30 @@ const Navbar = () => {
           </div>
 
           {/* Certificate Verification Mobile */}
-          <div className="px-4 py-4 mb-6 bg-white/5 rounded-2xl border border-white/10 shadow-inner">
-            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-[0.2em] mb-4 pl-1">Certificate Verification</p>
-            <div className="flex items-center">
-              <input
-                type="text"
-                id="mobile-nav-cert-id"
-                placeholder="Enter ID"
-                className="flex-1 px-3 py-2.5 bg-[#0a0a0a] border border-white/10 rounded-l-xl text-white text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500 placeholder:text-gray-600"
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    const id = e.target.value.trim();
-                    if (id) {
-                      navigate(`/verify-certificate?id=${id}`);
-                      setMobileMenuOpen(false);
+          <div className="mt-4 px-4 py-6 bg-white/5 rounded-3xl border border-white/10 shadow-xl mb-8">
+            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-[0.2em] mb-4 pl-1 flex items-center">
+              <Award className="h-3 w-3 mr-2 text-cyan-400" />
+              Verify Certificate
+            </p>
+            <div className="flex items-center group">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  id="mobile-nav-cert-id"
+                  placeholder="Enter Certificate ID"
+                  className="w-full pl-10 pr-3 py-3 bg-[#0f0f0f]/80 border border-white/10 rounded-l-2xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all placeholder:text-gray-600"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      const id = e.target.value.trim();
+                      if (id) {
+                        navigate(`/verify-certificate?id=${id}`);
+                        setMobileMenuOpen(false);
+                      }
                     }
-                  }
-                }}
-              />
+                  }}
+                />
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 group-focus-within:text-cyan-400 transition-colors" />
+              </div>
               <button
                 onClick={() => {
                   const id = document.getElementById('mobile-nav-cert-id').value.trim();
@@ -318,9 +329,9 @@ const Navbar = () => {
                     setMobileMenuOpen(false);
                   }
                 }}
-                className="px-4 py-2.5 bg-gradient-to-r from-cyan-400 to-blue-500 text-black font-bold text-sm rounded-r-xl shadow-[0_0_15px_rgba(34,211,238,0.3)]"
+                className="px-5 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-r-2xl shadow-lg shadow-cyan-500/20 active:scale-95 transition-all"
               >
-                Verify
+                <ArrowRight className="h-5 w-5" />
               </button>
             </div>
           </div>

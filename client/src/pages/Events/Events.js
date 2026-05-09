@@ -5,6 +5,7 @@ import { Calendar, MapPin, Clock, Users, Search, Filter, CalendarDays, X } from 
 import api from '../../utils/axiosConfig';
 import useCustomToast from '../../utils/customToast';
 import { formatDateIST, formatTimeIST, formatDateTimeIST, getTimeDifferenceIST } from '../../utils/timezoneUtils';
+import { CATEGORY_IMAGES } from '../../utils/imageConstants';
 
 const Events = () => {
   const toast = useCustomToast();
@@ -415,9 +416,9 @@ const Events = () => {
                         >
                           {/* Event Image with Dynamic Background */}
                           <div className="relative h-48 overflow-hidden">
-                            {event.image ? (
+                            {true ? (
                               <img
-                                src={event.image}
+                                src={event.image || CATEGORY_IMAGES[event.category] || CATEGORY_IMAGES.Default}
                                 alt={event.title}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {

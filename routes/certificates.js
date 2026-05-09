@@ -360,6 +360,45 @@ router.post('/admin/resend-email/:certId', auth, async (req, res) => {
   }
 });
 
+// ─── ADMIN: Bulk download ALL ZIP ─────────────────────────────────────────────
+router.get('/admin/bulk-download-all', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin access required' });
+
+    const certificates = await Certificate.find()
+      .populate('user', 'name email')
+      .populate('event')
+      .populate('attendance');
+
+    if (certificates.length === 0) {
+      return res.status(404).json({ message: 'No certificates found in the system' });
+    }
+
+    const zip = new JSZip();
+    const generator = new CertificateGenerator();
+
+    for (const cert of certificates) {
+      try {
+        const pdfBuffer = await generator.generateCertificate(cert, cert.user, cert.event, cert.attendance);
+        const folderName = cert.event?.title.replace(/\s+/g, '_') || 'General';
+        const fileName = `${cert.user.name.replace(/\s+/g, '_')}_${cert.certificateId}.pdf`;
+        zip.folder(folderName).file(fileName, pdfBuffer);
+      } catch (err) {
+        console.error(`PDF gen failed for ${cert.user?.name}:`, err.message);
+      }
+    }
+
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename=All_Eventra_Certificates.zip');
+    res.send(zipBuffer);
+  } catch (error) {
+    console.error('Bulk download all error:', error.message);
+    res.status(500).json({ message: 'Global bulk download failed' });
+  }
+});
+
 // ─── ADMIN: Bulk download ZIP ─────────────────────────────────────────────────
 router.get('/admin/bulk-download/:eventId', auth, async (req, res) => {
   try {
@@ -416,6 +455,43 @@ router.put('/admin/revoke/:certId', auth, async (req, res) => {
     res.json({ success: true, message: 'Certificate revoked', certificate });
   } catch (error) {
     res.status(500).json({ message: 'Failed to revoke certificate' });
+  }
+});
+
+// ─── ADMIN: Bulk download USER ZIP ─────────────────────────────────────────────
+router.get('/admin/bulk-download-user/:userId', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin access required' });
+
+    const certificates = await Certificate.find({ user: req.params.userId })
+      .populate('user', 'name email')
+      .populate('event')
+      .populate('attendance');
+
+    if (certificates.length === 0) {
+      return res.status(404).json({ message: 'No certificates found for this user' });
+    }
+
+    const zip = new JSZip();
+    const generator = new CertificateGenerator();
+
+    for (const cert of certificates) {
+      try {
+        const pdfBuffer = await generator.generateCertificate(cert, cert.user, cert.event, cert.attendance);
+        zip.file(`${cert.event?.title.replace(/\s+/g, '_')}_${cert.certificateId}.pdf`, pdfBuffer);
+      } catch (err) {
+        console.error(`PDF gen failed for ${cert.event?.title}:`, err.message);
+      }
+    }
+
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename=Certificates_${certificates[0].user.name.replace(/\s+/g, '_')}.zip`);
+    res.send(zipBuffer);
+  } catch (error) {
+    console.error('User bulk download error:', error.message);
+    res.status(500).json({ message: 'User bulk download failed' });
   }
 });
 

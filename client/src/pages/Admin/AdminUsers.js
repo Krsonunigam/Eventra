@@ -222,6 +222,26 @@ const AdminUsers = () => {
     }
   };
 
+  const downloadUserCertificates = async (userId, userName) => {
+    try {
+      toast.info(`Preparing certificates for ${userName}...`);
+      const response = await api.get(`/api/certificates/admin/bulk-download-user/${userId}`, {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Certificates_${userName.replace(/\s+/g, '_')}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Download completed successfully');
+    } catch (error) {
+      toast.error('No certificates found for this user');
+    }
+  };
+
   const handleDeleteConfirm = async () => {
     if (!userToDelete) return;
     
@@ -647,6 +667,13 @@ const AdminUsers = () => {
                             <UserCheck className="h-4 w-4" />
                           </button>
                         )}
+                        <button
+                          onClick={() => downloadUserCertificates(user._id, user.name)}
+                          className="p-1 text-gray-400 hover:text-green-400 transition-colors"
+                          title="Download All Certificates"
+                        >
+                          <Download className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => handleUserAction(user._id, 'delete')}
                           className="p-1 text-gray-400 hover:text-red-400 transition-colors"

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { Calendar, Mail, Phone, MapPin, Github, Twitter, Linkedin, Instagram } from 'lucide-react';
 
 const Footer = () => {
@@ -35,9 +36,15 @@ const Footer = () => {
   ];
 
   return (
-    <footer className="bg-gray-900 border-t border-gray-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+    <footer className="bg-[#0a0a0a] border-t border-white/10 pt-16 pb-8 overflow-hidden">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
           {/* Brand section */}
         <div className="lg:col-span-1">
           <div className="flex items-center space-x-2 mb-4">
@@ -142,7 +149,7 @@ const Footer = () => {
             © {currentYear} Eventra. All rights reserved.
           </p>
         </div>
-      </div>
+      </motion.div>
     </footer>
   );
 };

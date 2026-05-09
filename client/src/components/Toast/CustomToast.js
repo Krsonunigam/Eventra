@@ -5,13 +5,14 @@ import { toast } from 'react-hot-toast';
 
 const CustomToast = ({ t, message, type, title, style }) => {
   const getColors = () => {
+    const brandColor = '#F17A31'; // Brand color from logo
     switch (type) {
-      case 'success': return { bg: 'bg-green-500', border: 'border-green-600', iconBg: 'bg-green-600' };
-      case 'error': return { bg: 'bg-red-500', border: 'border-red-600', iconBg: 'bg-red-600' };
-      case 'warning': return { bg: 'bg-yellow-500', border: 'border-yellow-600', iconBg: 'bg-yellow-600' };
-      case 'info': return { bg: 'bg-blue-500', border: 'border-blue-600', iconBg: 'bg-blue-600' };
-      case 'loading': return { bg: 'bg-gray-600', border: 'border-gray-700', iconBg: 'bg-gray-700' };
-      default: return { bg: 'bg-gray-700', border: 'border-gray-800', iconBg: 'bg-gray-800' };
+      case 'success': return { border: 'border-orange-600', customBg: brandColor };
+      case 'error': return { border: 'border-red-600', customBg: '#ef4444' };
+      case 'warning': return { border: 'border-amber-600', customBg: '#f59e0b' };
+      case 'info': return { border: 'border-blue-600', customBg: '#3b82f6' };
+      case 'loading': return { border: 'border-gray-700', customBg: '#1f2937' };
+      default: return { border: 'border-gray-800', customBg: '#111827' };
     }
   };
 
@@ -27,26 +28,42 @@ const CustomToast = ({ t, message, type, title, style }) => {
     }
   };
 
-  const { bg, border } = getColors();
+  const { bg, border, customBg } = getColors();
 
   return (
     <AnimatePresence>
       {t.visible && (
         <motion.div
-          initial={{ opacity: 0, y: -50, scale: 0.3 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -20, scale: 0.5 }}
-          className={`${bg} ${border} border-l-4 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5 max-w-md w-full`}
-          style={style}
+          initial={{ opacity: 0, y: 20, scale: 0.95, filter: 'blur(8px)' }}
+          animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+          exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.15, ease: 'easeOut' } }}
+          transition={{ 
+            type: 'spring', 
+            damping: 22, 
+            stiffness: 260,
+            mass: 1
+          }}
+          className={`${border} border-l-4 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-2xl pointer-events-auto flex ring-1 ring-white/10 max-w-md w-full backdrop-blur-2xl transition-shadow duration-300`}
+          style={{ 
+            backgroundColor: customBg ? `${customBg}ee` : undefined,
+            boxShadow: customBg ? `0 20px 40px -15px ${customBg}44` : undefined,
+            ...style 
+          }}
         >
           <div className="flex-1 w-0 p-4">
-            <div className="flex items-start">
-              <div className="flex-shrink-0 pt-0.5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 p-2.5 bg-black/10 rounded-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]">
                 {getIcon()}
               </div>
-              <div className="ml-3 flex-1">
-                {title && <p className="text-sm font-medium text-white">{title}</p>}
-                <p className={`mt-1 text-sm ${title ? 'text-gray-200' : 'text-white'}`}>{message}</p>
+              <div className="ml-4 flex-1">
+                {title && (
+                  <p className="text-sm font-bold text-white mb-0.5 tracking-wide uppercase opacity-90">
+                    {title}
+                  </p>
+                )}
+                <p className="text-sm font-medium text-white/95 leading-relaxed">
+                  {message}
+                </p>
               </div>
             </div>
           </div>
@@ -58,6 +75,13 @@ const CustomToast = ({ t, message, type, title, style }) => {
               <X className="h-5 w-5" />
             </button>
           </div>
+          {/* Progress Bar */}
+          <motion.div
+            initial={{ width: '100%' }}
+            animate={{ width: '0%' }}
+            transition={{ duration: 3, ease: 'linear' }}
+            className="absolute bottom-0 left-0 h-1 bg-white/20 rounded-b-2xl"
+          />
         </motion.div>
       )}
     </AnimatePresence>

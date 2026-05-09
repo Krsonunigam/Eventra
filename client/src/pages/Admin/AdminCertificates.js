@@ -78,6 +78,30 @@ const AdminCertificates = () => {
     }
   };
 
+  const handleGlobalBulkDownload = async () => {
+    try {
+      setBulkDownloading(true);
+      toast.info('Initializing global cryptographic export...');
+      
+      const response = await api.get('/api/certificates/admin/bulk-download-all', {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `All_Eventra_Certificates_${new Date().toISOString().split('T')[0]}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Global export completed successfully');
+    } catch (error) {
+      toast.error('Global export failed. Registry might be empty.');
+    } finally {
+      setBulkDownloading(false);
+    }
+  };
+
   const handleGenerateForEvent = async (eventId, eventTitle) => {
     try {
       setGenerating(true);
@@ -126,6 +150,17 @@ const AdminCertificates = () => {
               <button className="px-5 py-2 bg-blue-600 rounded-xl text-xs font-bold uppercase tracking-widest shadow-lg shadow-blue-900/20">All Records</button>
               <button className="px-5 py-2 hover:bg-white/5 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-500 transition-all">Verification Logs</button>
             </div>
+            
+            <button 
+              onClick={handleGlobalBulkDownload}
+              disabled={bulkDownloading}
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-900/20 hover:scale-105 transition-all flex items-center gap-3 disabled:opacity-50"
+              title="Download All Certificates in System"
+            >
+              <DownloadCloud className={`h-4 w-4 ${bulkDownloading ? 'animate-bounce' : ''}`} />
+              <span>Export All</span>
+            </button>
+
             <button 
               onClick={fetchData}
               className="p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all"
