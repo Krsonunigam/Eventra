@@ -41,7 +41,6 @@ const Navbar = () => {
   const navItems = useMemo(() => [
     { name: 'Events', path: '/events', icon: Calendar },
     { name: 'Admin Registration', path: '/admin/subscription', icon: Crown, highlight: true },
-    { name: 'Certification', path: '/certification', icon: Award },
   ], []);
 
   const userMenuItems = useMemo(() => [
@@ -122,6 +121,33 @@ const Navbar = () => {
                 </Link>
               )
             ))}
+
+            {/* Certificate Verification Quick Link */}
+            <div className="flex items-center ml-4 pl-4 border-l border-white/10">
+              <div className="flex items-center">
+                <input
+                  type="text"
+                  id="nav-cert-id"
+                  placeholder="Verify Certificate ID"
+                  className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-l-lg text-white text-xs focus:outline-none focus:ring-1 focus:ring-cyan-500 w-40 placeholder:text-gray-500"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      const id = e.target.value.trim();
+                      if (id) navigate(`/verify-certificate?id=${id}`);
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    const id = document.getElementById('nav-cert-id').value.trim();
+                    if (id) navigate(`/verify-certificate?id=${id}`);
+                  }}
+                  className="px-3 py-1.5 bg-gradient-to-r from-cyan-400 to-blue-500 text-black font-bold text-xs rounded-r-lg hover:from-cyan-500 hover:to-blue-600 transition-all shadow-[0_0_15px_rgba(34,211,238,0.3)]"
+                >
+                  Verify
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Right side - Desktop actions */}
