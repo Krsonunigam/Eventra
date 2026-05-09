@@ -68,19 +68,18 @@ credentials.json
 *.ckpt
 *.pkl
 *.joblib
-models/
+# NOTE: 'models/' is NOT ignored — it contains the Mongoose DB models needed by the app.
+# Only ignore ML binary weight files.
 weights/
 face_recognition_data/
 face_data/
 
 # Test model Markdown files (do not push test/demo model docs or temporary model notes)
-# Add specific filenames that your project generates or uses for test-model docs.
 test_model.md
 model_test.md
 sample_model.md
 demo_model.md
-*_model.md
-model-*.md
+
 
 
 # Model/test artifact directories
@@ -125,9 +124,6 @@ htmlcov/
 # Ignore temporary or generated files commonly found in this repo
 *.bak
 *.tmp
-
-# Ignore all Markdown files — user requested no .md pushed
-*.md
 
 # End of .gitignore
 
