@@ -39,7 +39,6 @@ const Navbar = () => {
   };
 
   const navItems = useMemo(() => [
-    { name: 'Events', path: '/events', icon: Calendar },
     { name: 'Admin Registration', path: '/admin/subscription', icon: Crown, highlight: true },
   ], []);
 
@@ -83,7 +82,7 @@ const Navbar = () => {
               <img 
                 src="/eventra-logo.svg" 
                 alt="Eventra Logo" 
-                className="h-16 w-auto transition-transform duration-300 group-hover:scale-105"
+                className="h-20 w-auto transition-transform duration-300 group-hover:scale-105"
               />
             </Link>
           </div>
@@ -150,16 +149,7 @@ const Navbar = () => {
             </div>
           </div>
 
-          {/* Right side - Desktop actions */}
           <div className="hidden md:flex items-center space-x-4">
-            <Link
-              to="/contact"
-              className="text-gray-300 hover:text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 hover:bg-white/5 flex items-center space-x-2 focus:outline-none"
-            >
-              <Phone className="h-4 w-4" />
-              <span>Contact</span>
-            </Link>
-
             {isAuthenticated ? (
               <div className="relative" ref={userMenuRef}>
                 <button
@@ -289,15 +279,6 @@ const Navbar = () => {
               <span>{item.name}</span>
             </Link>
           ))}
-          
-            <Link
-              to="/contact"
-              className="block px-4 py-3 rounded-xl text-base font-medium text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-300 flex items-center space-x-3"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <Phone className="h-5 w-5" />
-              <span>Contact Us</span>
-            </Link>
           </div>
 
           {/* Certificate Verification Mobile */}
