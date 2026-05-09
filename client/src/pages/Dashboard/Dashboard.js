@@ -20,6 +20,7 @@ import {
   Plus,
   QrCode,
   Camera,
+  Award,
   MapPin as LocationIcon
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -728,6 +729,13 @@ useEffect(() => {
               >
                 <Camera className="h-5 w-5 mr-2" />
                 Face Recognition
+              </button>
+              <button 
+                onClick={() => navigate('/my-certificates')}
+                className="flex items-center justify-center p-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-semibold rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-200"
+              >
+                <Award className="h-5 w-5 mr-2" />
+                My Certificates
               </button>
             </div>
           </motion.div>

@@ -26,6 +26,24 @@ const EventCreate = () => {
         imageUrl = uploadResponse.data.url;
       }
 
+      // Handle signature upload if present
+      let signatureUrl = '';
+      if (formData.signatureImage && formData.signatureImage instanceof File) {
+        const signatureFormData = new FormData();
+        signatureFormData.append('signatureImage', formData.signatureImage);
+        
+        const signatureResponse = await api.post('/api/upload/signature', signatureFormData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        signatureUrl = signatureResponse.data.url;
+      }
+
+      if (!signatureUrl && !formData.certificateSignature) {
+        toast.error('Authorized signature is mandatory for certificate generation');
+        setLoading(false);
+        return;
+      }
+
       // Prepare the event data
       const eventData = {
         title: formData.title,
@@ -63,7 +81,8 @@ const EventCreate = () => {
         organizer: formData.organizer || '',
         status: 'draft',
         isActive: true,
-        image: imageUrl
+        image: imageUrl,
+        certificateSignature: signatureUrl || formData.certificateSignature
       };
 
       

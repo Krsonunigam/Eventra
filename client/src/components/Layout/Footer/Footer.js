@@ -136,15 +136,44 @@ const Footer = () => {
           </div>
         </div>
 
-        {/* Copyright */}
+        {/* Copyright & Verification */}
         <div className="mt-8 pt-8 border-t border-gray-800">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-400 text-sm">
-              © {currentYear} Eventra. All rights reserved.
-            </p>
-            {/* <p className="text-gray-400 text-sm mt-2 md:mt-0">
-              Built by Team HackFinity
-            </p> */}
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div>
+              <p className="text-gray-400 text-sm">
+                © {currentYear} Eventra. All rights reserved.
+              </p>
+            </div>
+
+            {/* Certificate Verification Quick Link */}
+            <div className="w-full md:w-auto">
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <span className="text-gray-400 text-sm font-medium">Verify Certificate:</span>
+                <div className="flex items-center">
+                  <input
+                    type="text"
+                    id="footer-cert-id"
+                    placeholder="Enter Certificate ID"
+                    className="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-l-lg text-white text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500 w-48"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        const id = e.target.value.trim();
+                        if (id) window.location.href = `/verify-certificate?id=${id}`;
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      const id = document.getElementById('footer-cert-id').value.trim();
+                      if (id) window.location.href = `/verify-certificate?id=${id}`;
+                    }}
+                    className="px-4 py-1.5 bg-gradient-to-r from-cyan-400 to-blue-500 text-black font-semibold text-sm rounded-r-lg hover:from-cyan-500 hover:to-blue-600 transition-all"
+                  >
+                    Verify
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

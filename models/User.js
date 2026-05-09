@@ -23,8 +23,20 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
+    required: function() {
+      return this.authProvider !== 'google';
+    },
     minlength: 6
+  },
+  authProvider: {
+    type: String,
+    enum: ['local', 'google'],
+    default: 'local'
+  },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true
   },
   role: {
     type: String,
@@ -110,6 +122,20 @@ const userSchema = new mongoose.Schema({
       enum: ['light', 'dark', 'auto'],
       default: 'auto'
     }
+  },
+  
+  // OTP Reset Fields
+  resetPasswordOTP: {
+    type: String,
+    default: null
+  },
+  resetPasswordExpires: {
+    type: Date,
+    default: null
+  },
+  resetPasswordAttempts: {
+    type: Number,
+    default: 0
   },
   
   // Face Recognition Fields

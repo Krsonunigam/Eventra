@@ -2,30 +2,45 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { auth } = require('../middleware/auth');
+const { OAuth2Client } = require('google-auth-library');
 const emailVerificationService = require('../utils/emailVerification');
 const { storeFaceData, verifyFace } = require('../utils/pureNodeFaceRecognition');
+const { sendResetOTP } = require('../utils/emailService');
+const crypto = require('crypto');
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const router = express.Router();
 
 // Register new user
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, studentId, institute, dateOfBirth, phoneNumber, interests } = req.body;
+    let { name, email, password, studentId, institute, dateOfBirth, phoneNumber, interests } = req.body;
 
     // Basic input validation
     if (!name || !email || !password || !studentId || !institute || !dateOfBirth || !phoneNumber) {
-      return res.status(400).json({ message: 'Missing required fields' });
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+
+    // Email normalization & validation
+    email = email.toLowerCase().trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ success: false, message: 'Invalid email format' });
     }
 
     const dob = new Date(dateOfBirth);
     if (isNaN(dob.getTime())) {
-      return res.status(400).json({ message: 'Invalid date of birth format' });
+      return res.status(400).json({ success: false, message: 'Invalid date of birth format' });
     }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ message: 'User already exists with this email' });
+      return res.status(400).json({
+        success: false,
+        message: "This email is already registered. Please login."
+      });
     }
 
     // Create new user
@@ -78,19 +93,19 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' });
+      return res.status(400).json({ success: false, message: 'Email and password are required' });
     }
 
     // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
     // Check password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
     // Generate JWT token
@@ -100,33 +115,196 @@ router.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-   res.json({
-  message: 'Login successful',
-  token,
-  user: {
-    id: user._id,
-    name: user.name,
-    email: user.email,
-    studentId: user.studentId,
-    institute: user.institute,
-    dateOfBirth: user.dateOfBirth,
-    phoneNumber: user.phoneNumber,
-    interests: user.interests,
-    isActive: user.isActive,
-    emailVerified: user.emailVerified,
-
-    // 🔥🔥🔥 MAIN FIX (ADD THIS)
-    faceDataCollected: user.faceDataCollected || false,
-    faceTrainingCompleted: user.faceTrainingCompleted || false,
-    faceSampleCount: user.faceSampleCount || 0,
-    isFaceVerified: user.isFaceVerified || false,
-    faceTrainingDate: user.faceTrainingDate || null
-  }
-});
+    res.json({
+      success: true,
+      message: 'Login successful',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        emailVerified: user.emailVerified,
+        faceDataCollected: user.faceDataCollected || false,
+        faceTrainingCompleted: user.faceTrainingCompleted || false,
+        faceSampleCount: user.faceSampleCount || 0,
+        isFaceVerified: user.isFaceVerified || false,
+        faceTrainingDate: user.faceTrainingDate || null
+      }
+    });
 
   } catch (error) {
     
-    res.status(500).json({ message: 'Login failed', error: error.message });
+    res.status(500).json({ success: false, message: 'Login failed', error: error.message });
+  }
+});
+
+// Google Login/Register
+router.post('/google', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Google token is required' });
+    }
+
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+
+    const { name, email, picture, sub: googleId } = ticket.getPayload();
+
+    let user = await User.findOne({ $or: [{ googleId }, { email: email.toLowerCase() }] });
+
+    if (!user) {
+      // Create new user (Always normal user role)
+      user = new User({
+        name,
+        email: email.toLowerCase(),
+        googleId,
+        authProvider: 'google',
+        profilePicture: picture,
+        role: 'user', // Force normal user role
+        emailVerified: true // Google emails are pre-verified
+      });
+      await user.save();
+    } else if (user.authProvider !== 'google') {
+      // Link existing local account to Google if emails match
+      user.googleId = googleId;
+      user.authProvider = 'google';
+      if (!user.profilePicture) user.profilePicture = picture;
+      await user.save();
+    }
+
+    // Generate JWT token
+    const jwtToken = jwt.sign(
+      { userId: user._id, email: user.email },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      success: true,
+      message: 'Google login successful',
+      token: jwtToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        profilePicture: user.profilePicture,
+        faceDataCollected: user.faceDataCollected || false,
+        isFaceVerified: user.isFaceVerified || false
+      }
+    });
+
+  } catch (error) {
+    
+    res.status(500).json({ success: false, message: 'Google authentication failed', error: error.message });
+  }
+});
+
+// Forgot Password - Send OTP
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      // We still return success to prevent email enumeration
+      return res.json({ success: true, message: 'If an account with that email exists, an OTP has been sent.' });
+    }
+
+    // Generate 6 digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Set expiry to 5 minutes
+    const expiry = new Date();
+    expiry.setMinutes(expiry.getMinutes() + 5);
+
+    user.resetPasswordOTP = otp;
+    user.resetPasswordExpires = expiry;
+    user.resetPasswordAttempts = 0;
+    await user.save();
+
+    await sendResetOTP(user.email, otp);
+
+    res.json({ success: true, message: 'OTP sent successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to send OTP', error: error.message });
+  }
+});
+
+// Verify OTP
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) return res.status(400).json({ success: false, message: 'Email and OTP are required' });
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (!user.resetPasswordOTP || !user.resetPasswordExpires) {
+      return res.status(400).json({ success: false, message: 'No OTP request found for this email' });
+    }
+
+    if (new Date() > user.resetPasswordExpires) {
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new one.' });
+    }
+
+    if (user.resetPasswordAttempts >= 5) {
+      return res.status(400).json({ success: false, message: 'Too many failed attempts. Please request a new OTP.' });
+    }
+
+    if (user.resetPasswordOTP !== otp) {
+      user.resetPasswordAttempts += 1;
+      await user.save();
+      return res.status(400).json({ success: false, message: 'Invalid OTP' });
+    }
+
+    // Mark as verified by clearing OTP but leaving a flag or just sending success
+    // In a real app we might issue a short-lived reset token here.
+    // For simplicity, we can let them proceed to the next step, but we shouldn't clear the OTP until password is reset,
+    // OR we clear it and set a flag. Let's just respond success and they must include OTP in the final reset request.
+    res.json({ success: true, message: 'OTP verified successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to verify OTP', error: error.message });
+  }
+});
+
+// Reset Password
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Email, OTP, and new password are required' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (!user.resetPasswordOTP || user.resetPasswordOTP !== otp) {
+      return res.status(400).json({ success: false, message: 'Invalid or missing OTP' });
+    }
+
+    if (new Date() > user.resetPasswordExpires) {
+      return res.status(400).json({ success: false, message: 'OTP has expired' });
+    }
+
+    // Reset password
+    user.password = newPassword; // Mongoose pre-save hook will hash it
+    user.resetPasswordOTP = null;
+    user.resetPasswordExpires = null;
+    user.resetPasswordAttempts = 0;
+    
+    await user.save();
+
+    res.json({ success: true, message: 'Password has been reset successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to reset password', error: error.message });
   }
 });
 
@@ -197,25 +375,29 @@ router.put('/profile', auth, async (req, res) => {
     } = req.body;
     
     // Find and update user
+    const updateData = {
+      ...(name && { name }),
+      ...(studentId && { studentId }),
+      ...(institute && { institute }),
+      ...(phoneNumber && { phoneNumber }),
+      ...(phone && { phone }),
+      ...(interests && { interests }),
+      ...(dateOfBirth && { dateOfBirth: new Date(dateOfBirth) }),
+      ...(gender && { gender }),
+      ...(bio !== undefined && { bio }),
+      ...(socialLinks && { socialLinks }),
+      ...(notificationPreferences && { notificationPreferences }),
+      ...(privacySettings && { privacySettings })
+    };
+
+    // Explicitly handle profilePicture (allow null/empty to clear)
+    if (req.body.hasOwnProperty('profilePicture')) {
+      updateData.profilePicture = profilePicture;
+    }
+
     const updatedUser = await User.findByIdAndUpdate(
       req.user.userId,
-      { 
-        $set: {
-          ...(name && { name }),
-          ...(studentId && { studentId }),
-          ...(institute && { institute }),
-          ...(phoneNumber && { phoneNumber }),
-          ...(phone && { phone }),
-          ...(interests && { interests }),
-          ...(profilePicture && { profilePicture }),
-          ...(dateOfBirth && { dateOfBirth: new Date(dateOfBirth) }),
-          ...(gender && { gender }),
-          ...(bio !== undefined && { bio }),
-          ...(socialLinks && { socialLinks }),
-          ...(notificationPreferences && { notificationPreferences }),
-          ...(privacySettings && { privacySettings })
-        }
-      },
+      { $set: updateData },
       { new: true, runValidators: true }
     );
 

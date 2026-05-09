@@ -25,6 +25,8 @@ const EventForm = ({ initialData = null, onSubmit, loading = false }) => {
   const [sponsors, setSponsors] = useState(initialData?.sponsors || ['']);
   const [bannerImage, setBannerImage] = useState(null);
   const [bannerPreview, setBannerPreview] = useState(initialData?.image || null);
+  const [signatureImage, setSignatureImage] = useState(null);
+  const [signaturePreview, setSignaturePreview] = useState(initialData?.certificateSignature || null);
 
   const { register, handleSubmit, control, formState: { errors }, reset } = useForm({
     defaultValues: initialData || {
@@ -38,7 +40,8 @@ const EventForm = ({ initialData = null, onSubmit, loading = false }) => {
       price: '',
       organizer: '',
       tags: [],
-      organizerContact: { email: '', phone: '' }
+      organizerContact: { email: '', phone: '' },
+      certificateSignature: ''
     }
   });
 
@@ -69,6 +72,7 @@ const EventForm = ({ initialData = null, onSubmit, loading = false }) => {
       setScheduleItems(initialData.detailedSchedule || [{ time: '', activity: '', speaker: '' }]);
       setSponsors(initialData.sponsors || ['']);
       setBannerPreview(initialData.image || null);
+      setSignaturePreview(initialData.certificateSignature || null);
     }
   }, [initialData, reset]);
 
@@ -116,12 +120,23 @@ const EventForm = ({ initialData = null, onSubmit, loading = false }) => {
     }
   };
 
+  const handleSignatureUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSignatureImage(file);
+      const reader = new FileReader();
+      reader.onload = (e) => setSignaturePreview(e.target.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
   const onFormSubmit = (data) => {
     const formData = {
       ...data,
       detailedSchedule: scheduleItems.filter(item => item.time && item.activity),
       sponsors: sponsors.filter(sponsor => sponsor.trim()),
       bannerImage: bannerImage,
+      signatureImage: signatureImage,
       price: Math.round(parseFloat(data.price) * 100) / 100 || 0
     };
     
@@ -393,6 +408,52 @@ const EventForm = ({ initialData = null, onSubmit, loading = false }) => {
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Certificate Signature */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Authorized Signature (For Certificates) *
+            </label>
+            <div className="space-y-4">
+              {signaturePreview && (
+                <div className="relative inline-block">
+                  <img
+                    src={signaturePreview}
+                    alt="Signature preview"
+                    className="h-24 bg-white p-2 rounded-lg"
+                  />
+                </div>
+              )}
+              <div className="flex items-center space-x-4">
+                <label className="flex items-center space-x-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg cursor-pointer transition-colors">
+                  <Upload className="h-5 w-5 text-cyan-400" />
+                  <span className="text-white">Upload Signature</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleSignatureUpload}
+                    className="hidden"
+                  />
+                </label>
+                {signaturePreview && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSignaturePreview(null);
+                      setSignatureImage(null);
+                    }}
+                    className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white transition-colors"
+                  >
+                    <X className="h-5 w-5" />
+                    <span>Remove</span>
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-gray-400">
+                Mandatory for certificate generation. Transparent PNG recommended.
+              </p>
             </div>
           </div>
 

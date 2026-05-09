@@ -16,10 +16,11 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
-  const fetchCurrentUser = useCallback(async (authToken = token) => {
-    const config = authToken
-      ? { headers: { Authorization: `Bearer ${authToken}` } }
-      : undefined;
+  const fetchCurrentUser = useCallback(async (authToken) => {
+    const currentToken = authToken || localStorage.getItem('token');
+    if (!currentToken) return null;
+
+    const config = { headers: { Authorization: `Bearer ${currentToken}` } };
 
     const meRes = await api.get('/api/auth/me', config);
     const freshUser = meRes.data.user;
@@ -32,7 +33,7 @@ export const AuthProvider = ({ children }) => {
     
     setUser(freshUser);
     return freshUser;
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -65,7 +66,31 @@ export const AuthProvider = ({ children }) => {
     return () => {
       isMounted = false;
     };
-  }, [fetchCurrentUser, token]);
+  }, [fetchCurrentUser]); // Removed token from dependencies to prevent double-fetch on login
+
+  const googleLogin = async (googleToken) => {
+    try {
+      setLoading(true);
+      const response = await api.post('/api/auth/google', { token: googleToken });
+      const { token: newToken } = response.data;
+
+      localStorage.setItem('token', newToken);
+      setToken(newToken);
+
+      const freshUser = await fetchCurrentUser(newToken);
+      return { success: true, user: freshUser };
+    } catch (error) {
+      localStorage.removeItem('token');
+      setToken(null);
+      setUser(null);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Google login failed'
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const login = async (email, password) => {
     try {
@@ -205,6 +230,7 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin',
     login,
+    googleLogin,
     register,
     registerUser,
     logout,

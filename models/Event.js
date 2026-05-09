@@ -67,6 +67,10 @@ const eventSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  certificateSignature: {
+    type: String,
+    default: ''
+  },
   organizer: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

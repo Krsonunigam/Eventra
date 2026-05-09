@@ -21,7 +21,8 @@ import {
   Shield,
   CheckCircle,
   Scan,
-  RefreshCw
+  RefreshCw,
+  Award
 } from 'lucide-react';
 import api from '../../utils/axiosConfig';
 import useCustomToast from '../../utils/customToast';
@@ -241,6 +242,13 @@ const AdminDashboard = () => {
             >
               <Download className="h-5 w-5 text-green-400" />
               <span className="text-white">Export Reports</span>
+            </Link>
+            <Link
+              to="/admin/certificates"
+              className="flex items-center space-x-3 p-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+            >
+              <Award className="h-5 w-5 text-yellow-400" />
+              <span className="text-white">Certificates</span>
             </Link>
             <button
               onClick={() => {

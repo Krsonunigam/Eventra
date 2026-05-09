@@ -69,14 +69,11 @@ const UserProfileForm = ({ user, onSubmit, onPasswordChange, loading = false, is
 // ONLY showing FIXED onFormSubmit part (rest same as your file)
 
 const onFormSubmit = async (data) => {
-  
-
   // 🔥 HANDLE PASSWORD
   if (data.currentPassword && data.newPassword && onPasswordChange) {
     try {
       await onPasswordChange(data.currentPassword, data.newPassword);
     } catch (error) {
-      
       return;
     }
   }
@@ -84,39 +81,12 @@ const onFormSubmit = async (data) => {
   // ❌ REMOVE PASSWORD FIELDS
   const { currentPassword, newPassword, confirmPassword, ...profileData } = data;
 
-  // 🔥 CLEAN OBJECT (NO FormData)
+  // 🔥 CLEAN OBJECT
   const cleanData = {
-    name: profileData.name,
-    email: profileData.email,
-    phoneNumber: profileData.phoneNumber,
-    institute: profileData.institute,
-    role: profileData.role,
-    gender: profileData.gender,
-    dateOfBirth: profileData.dateOfBirth,
+    ...profileData,
+    profileImage: profileImage, // The file object for upload
+    profilePicture: profilePreview // The current URL (or null if removed)
   };
-
-  // ✅ Optional fields
-  if (profileData.bio) cleanData.bio = profileData.bio;
-
-  // ✅ Nested objects
-  if (profileData.socialLinks) {
-    cleanData.socialLinks = profileData.socialLinks;
-  }
-
-  if (profileData.notificationPreferences) {
-    cleanData.notificationPreferences = profileData.notificationPreferences;
-  }
-
-  if (profileData.privacySettings) {
-    cleanData.privacySettings = profileData.privacySettings;
-  }
-
-  // 🔥 ADD IMAGE SEPARATELY
-  if (profileImage) {
-    cleanData.profileImage = profileImage;
-  }
-
-  
 
   // 🚀 SEND CLEAN OBJECT
   onSubmit(cleanData);

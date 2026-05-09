@@ -16,10 +16,8 @@ const ProfileEdit = () => {
     try {
       setLoading(true);
 
-      // 🔥 STEP 1: HANDLE IMAGE UPLOAD
+      // 🔥 STEP 1: HANDLE IMAGE UPLOAD (IF NEW IMAGE SELECTED)
       if (formData.profileImage) {
-        
-
         const imageFormData = new FormData();
         imageFormData.append('profilePicture', formData.profileImage);
 
@@ -33,43 +31,34 @@ const ProfileEdit = () => {
 
         if (uploadResponse.ok) {
           const uploadResult = await uploadResponse.json();
-          
-
-          // ✅ FIX: Ensure string URL
-          const imageUrl =
-            uploadResult.secure_url ||
-            uploadResult.url ||
-            uploadResult.imageUrl;
-
-          formData.profilePicture = String(imageUrl);
-
-          
+          // ✅ Cloudinary returns the URL in 'url' field per routes/upload.js
+          formData.profilePicture = uploadResult.url || uploadResult.secure_url;
         } else {
-          const errorText = await uploadResponse.text();
-          
           toast.error('Failed to upload profile picture');
           return;
         }
       }
 
-      // ❌ Remove file object
+      // Cleanup
       delete formData.profileImage;
 
-      // 🔥 STEP 2: CONVERT TO NORMAL OBJECT (MAIN FIX)
-      const dataToSend = { ...formData };
-
-      
+      // 🔥 STEP 2: ENSURE profilePicture IS CLEAN
+      // If profilePicture is a data URL (and upload failed or didn't happen), remove it
+      if (formData.profilePicture && formData.profilePicture.startsWith('data:')) {
+        delete formData.profilePicture;
+      }
 
       // 🔥 STEP 3: UPDATE PROFILE
-      const result = await updateProfile(dataToSend);
+      const result = await updateProfile(formData);
 
       if (result.success) {
         toast.success('Profile updated successfully!');
         navigate('/profile');
+      } else {
+        toast.error('Failed to update profile');
       }
     } catch (error) {
-      
-      toast.error('Failed to update profile');
+      toast.error('An error occurred while updating profile');
     } finally {
       setLoading(false);
     }

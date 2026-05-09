@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
-import { Eye, EyeOff, Mail, Lock, User, Phone, Calendar, GraduationCap, Camera } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Phone, Calendar, GraduationCap, Camera, Loader2 } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../contexts/AuthContext';
 import FaceTraining from '../../components/FaceRecognition/FaceTraining';
 import useCustomToast from '../../utils/customToast';
@@ -12,7 +13,7 @@ const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showFaceCapture, setShowFaceCapture] = useState(false);
   const [registrationData, setRegistrationData] = useState(null);
-  const { register: registerUser, login, loading, user } = useAuth();
+  const { register: registerUser, login, googleLogin, loading, user } = useAuth();
   const navigate = useNavigate();
   const { register, handleSubmit, watch, formState: { errors } } = useForm();
   const toast = useCustomToast();
@@ -20,36 +21,71 @@ const Register = () => {
   const password = watch('password');
 
   const onSubmit = async (data) => {
-    const result = await registerUser(data);
-    if (result.success) {
-      // Auto-login so face verification endpoint has auth token
-      const loginRes = await login(data.email, data.password);
-      if (loginRes.success) {
-        // Check if user came from admin subscription page
-        const selectedPlan = localStorage.getItem('selectedPlan');
-        if (selectedPlan) {
-          // Store the selected plan for after face recognition
-          // Don't clear it yet, we'll need it after face training
-          // Store registration data and show face training for admin users too
-          setRegistrationData({ ...data, selectedPlan });
-          setShowFaceCapture(true);
-          toast.info('Please complete face training for admin access');
-          return;
-        }
-        
-        // Skip face recognition for admin users
-        if (loginRes.user?.role === 'admin') {
-          navigate('/admin');
+    try {
+      const result = await registerUser(data);
+      if (result.success) {
+        // Auto-login so face verification endpoint has auth token
+        const loginRes = await login(data.email, data.password);
+        if (loginRes.success) {
+          // Check if user came from admin subscription page
+          const selectedPlan = localStorage.getItem('selectedPlan');
+          if (selectedPlan) {
+            setRegistrationData({ ...data, selectedPlan });
+            setShowFaceCapture(true);
+            toast.info('Please complete face training for admin access');
+            return;
+          }
+          
+          if (loginRes.user?.role === 'admin') {
+            navigate('/admin');
+          } else {
+            setRegistrationData(data);
+            setShowFaceCapture(true);
+            toast.info('Please complete face training for attendance tracking');
+          }
         } else {
-          // Store registration data and show face training for non-admin users
-          setRegistrationData(data);
-          setShowFaceCapture(true);
-          toast.info('Please complete face training for attendance tracking');
+          navigate('/login');
         }
       } else {
-        navigate('/login');
+        toast.error(result.error || 'Registration failed. Please try again.');
       }
+    } catch (error) {
+      toast.error('An unexpected error occurred. Please try again.');
     }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      const result = await googleLogin(credentialResponse.credential);
+      if (result.success) {
+        const user = result.user;
+        
+        if (user.role === 'admin') {
+          navigate('/admin');
+          return;
+        }
+
+        const hasCompletedFaceTraining = 
+          user.faceTrainingCompleted === true && user.faceDataCollected === true;
+
+        if (!hasCompletedFaceTraining) {
+          setRegistrationData(user);
+          setShowFaceCapture(true);
+          toast.info('Please complete face training for attendance tracking');
+          return;
+        }
+
+        navigate('/dashboard');
+      } else {
+        toast.error(result.error || 'Google registration failed');
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred during Google registration');
+    }
+  };
+
+  const handleGoogleError = () => {
+    toast.error('Google Registration Failed. Please try again.');
   };
 
   const handleFaceTrainingComplete = (result) => {
@@ -94,307 +130,258 @@ const Register = () => {
   ];
 
   return (
-    <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-[#0a0a0c]">
+      <div className="max-w-3xl w-full space-y-8 relative">
+        {/* Background glow effects */}
+        <div className="absolute -top-24 -left-24 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-24 -right-24 w-80 h-80 bg-cyan-600/10 rounded-full blur-3xl animate-pulse" />
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-center"
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="text-center relative z-10"
         >
-          {/* <div className="flex justify-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-xl flex items-center justify-center">
-              <Calendar className="h-8 w-8 text-white" />
-            </div>
-          </div> */}
-          <h2 className="mt-6 text-3xl font-bold text-white">
-            Create your account
+          <div className="inline-block p-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-white/10 mb-6">
+            <GraduationCap className="h-10 w-10 text-blue-400" />
+          </div>
+          <h2 className="text-4xl font-black text-white tracking-tight">
+            Join the Ecosystem
           </h2>
-          <p className="mt-2 text-gray-400">
-            Join Eventra and start managing events
+          <p className="mt-3 text-gray-400 font-medium">
+            Start your premium event experience with <span className="text-blue-400">Eventra</span>
           </p>
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="bg-gray-800 p-8 rounded-xl border border-gray-700"
+          className="bg-gray-900/50 backdrop-blur-xl p-8 sm:p-10 rounded-[3rem] border border-white/5 shadow-2xl relative z-10"
         >
-          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <div className="grid grid-cols-1 gap-6">
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
+          <form className="space-y-8" onSubmit={handleSubmit(onSubmit)}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+              {/* Full Name */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">
                   Full Name
                 </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <User className="h-5 w-5 text-gray-500 group-focus-within:text-blue-400 transition-colors" />
+                  </div>
                   <input
-                    {...register('name', { 
-                      required: 'Name is required',
-                      minLength: {
-                        value: 2,
-                        message: 'Name must be at least 2 characters'
-                      }
-                    })}
+                    {...register('name', { required: 'Name is required', minLength: { value: 2, message: 'Min 2 characters' } })}
                     type="text"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    placeholder="Enter your full name"
+                    className="block w-full pl-12 pr-4 py-4 bg-black/40 border border-white/5 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    placeholder="your name"
                   />
                 </div>
-                {errors.name && (
-                  <p className="mt-1 text-sm text-red-400">{errors.name.message}</p>
-                )}
+                {errors.name && <p className="text-[10px] font-bold text-red-400 ml-1">{errors.name.message}</p>}
               </div>
 
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+              {/* Email */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">
                   Email Address
                 </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-gray-500 group-focus-within:text-blue-400 transition-colors" />
+                  </div>
                   <input
-                    {...register('email', { 
-                      required: 'Email is required',
-                      pattern: {
-                        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                        message: 'Invalid email address'
-                      }
-                    })}
+                    {...register('email', { required: 'Email is required', pattern: { value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i, message: 'Invalid email' } })}
                     type="email"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    placeholder="Enter your email"
+                    className="block w-full pl-12 pr-4 py-4 bg-black/40 border border-white/5 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    placeholder="your@example.com"
                   />
                 </div>
-                {errors.email && (
-                  <p className="mt-1 text-sm text-red-400">{errors.email.message}</p>
-                )}
+                {errors.email && <p className="text-[10px] font-bold text-red-400 ml-1">{errors.email.message}</p>}
               </div>
 
-              <div>
-                <label htmlFor="studentId" className="block text-sm font-medium text-gray-300 mb-2">
+              {/* Student ID */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">
                   Student ID
                 </label>
-                <div className="relative">
-                  <GraduationCap className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <GraduationCap className="h-5 w-5 text-gray-500 group-focus-within:text-blue-400 transition-colors" />
+                  </div>
                   <input
-                    {...register('studentId', { 
-                      required: 'Student ID is required',
-                      minLength: {
-                        value: 3,
-                        message: 'Student ID must be at least 3 characters'
-                      }
-                    })}
+                    {...register('studentId', { required: 'ID is required' })}
                     type="text"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    placeholder="Enter your student ID"
+                    className="block w-full pl-12 pr-4 py-4 bg-black/40 border border-white/5 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    placeholder="202204178"
                   />
                 </div>
-                {errors.studentId && (
-                  <p className="mt-1 text-sm text-red-400">{errors.studentId.message}</p>
-                )}
+                {errors.studentId && <p className="text-[10px] font-bold text-red-400 ml-1">{errors.studentId.message}</p>}
               </div>
 
-              <div>
-                <label htmlFor="institute" className="block text-sm font-medium text-gray-300 mb-2">
-                  Institute/University
+              {/* Institute */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">
+                  Institute
                 </label>
-                <input
-                  {...register('institute', { 
-                    required: 'Institute is required',
-                    minLength: {
-                      value: 2,
-                      message: 'Institute name must be at least 2 characters'
-                    }
-                  })}
-                  type="text"
-                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                  placeholder="Enter your institute name"
-                />
-                {errors.institute && (
-                  <p className="mt-1 text-sm text-red-400">{errors.institute.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-300 mb-2">
-                  Date of Birth
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <div className="relative group">
                   <input
-                    {...register('dateOfBirth', { 
-                      required: 'Date of birth is required',
-                      validate: (value) => {
-                        const age = new Date().getFullYear() - new Date(value).getFullYear();
-                        return age >= 18 || 'You must be 18 years or older';
-                      }
-                    })}
-                    type="date"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    {...register('institute', { required: 'Institute is required' })}
+                    type="text"
+                    className="block w-full px-6 py-4 bg-black/40 border border-white/5 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    placeholder="Tula's Institute"
                   />
                 </div>
-                {errors.dateOfBirth && (
-                  <p className="mt-1 text-sm text-red-400">{errors.dateOfBirth.message}</p>
-                )}
+                {errors.institute && <p className="text-[10px] font-bold text-red-400 ml-1">{errors.institute.message}</p>}
               </div>
 
-              <div>
-                <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-300 mb-2">
+              {/* Phone Number */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">
                   Phone Number
                 </label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Phone className="h-5 w-5 text-gray-500 group-focus-within:text-blue-400 transition-colors" />
+                  </div>
                   <input
-                    {...register('phoneNumber', { 
-                      required: 'Phone number is required',
-                      pattern: {
-                        value: /^[0-9]{10}$/,
-                        message: 'Please enter a valid 10-digit phone number'
-                      }
-                    })}
+                    {...register('phoneNumber', { required: 'Phone is required', pattern: { value: /^[0-9]{10}$/, message: '10 digits required' } })}
                     type="tel"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    placeholder="Enter your phone number"
+                    className="block w-full pl-12 pr-4 py-4 bg-black/40 border border-white/5 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    placeholder="9876543210"
                   />
                 </div>
-                {errors.phoneNumber && (
-                  <p className="mt-1 text-sm text-red-400">{errors.phoneNumber.message}</p>
-                )}
+                {errors.phoneNumber && <p className="text-[10px] font-bold text-red-400 ml-1">{errors.phoneNumber.message}</p>}
               </div>
 
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
-                  Password
+              {/* Date of Birth */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">
+                  Date of Birth
                 </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Calendar className="h-5 w-5 text-gray-500 group-focus-within:text-blue-400 transition-colors" />
+                  </div>
                   <input
-                    {...register('password', { 
-                      required: 'Password is required',
-                      minLength: {
-                        value: 6,
-                        message: 'Password must be at least 6 characters'
-                      }
-                    })}
-                    type={showPassword ? 'text' : 'password'}
-                    className="w-full pl-10 pr-12 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    placeholder="Create a password"
+                    {...register('dateOfBirth', { required: 'DOB is required' })}
+                    type="date"
+                    className="block w-full pl-12 pr-4 py-4 bg-black/40 border border-white/5 rounded-2xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
-                  >
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">
+                  Create Your Password
+                </label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-500 group-focus-within:text-blue-400 transition-colors" />
+                  </div>
+                  <input
+                    {...register('password', { required: 'Required', minLength: { value: 6, message: 'Min 6' } })}
+                    type={showPassword ? 'text' : 'password'}
+                    className="block w-full pl-12 pr-12 py-4 bg-black/40 border border-white/5 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    placeholder="Create Password"
+                  />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500">
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
-                {errors.password && (
-                  <p className="mt-1 text-sm text-red-400">{errors.password.message}</p>
-                )}
               </div>
 
-              <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
-                  Confirm Password
+              {/* Confirm Password */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">
+                  Retype Your Password
                 </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-500 group-focus-within:text-blue-400 transition-colors" />
+                  </div>
                   <input
-                    {...register('confirmPassword', { 
-                      required: 'Please confirm your password',
-                      validate: (value) => value === password || 'Passwords do not match'
-                    })}
+                    {...register('confirmPassword', { required: 'Required', validate: (v) => v === password || 'Mismatch' })}
                     type={showConfirmPassword ? 'text' : 'password'}
-                    className="w-full pl-10 pr-12 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    placeholder="Confirm your password"
+                    className="block w-full pl-12 pr-12 py-4 bg-black/40 border border-white/5 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                    placeholder="Repeat Password"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
-                  >
+                  <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500">
                     {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
-                {errors.confirmPassword && (
-                  <p className="mt-1 text-sm text-red-400">{errors.confirmPassword.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Interests (Optional)
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {interests.map((interest) => (
-                    <label key={interest} className="flex items-center">
-                      <input
-                        {...register('interests')}
-                        type="checkbox"
-                        value={interest}
-                        className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-gray-600 rounded bg-gray-700"
-                      />
-                      <span className="ml-2 text-sm text-gray-300">{interest}</span>
-                    </label>
-                  ))}
-                </div>
               </div>
             </div>
 
-            <div className="flex items-center">
-              <input
-                {...register('terms', { required: 'You must accept the terms and conditions' })}
-                type="checkbox"
-                className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-gray-600 rounded bg-gray-700"
-              />
-              <label className="ml-2 block text-sm text-gray-300">
-                I agree to the{' '}
-                <button type="button" className="text-cyan-400 hover:text-cyan-300">
-                  Terms and Conditions
-                </button>{' '}
-                and{' '}
-                <button type="button" className="text-cyan-400 hover:text-cyan-300">
-                  Privacy Policy
-                </button>
+            {/* Interests */}
+            <div className="space-y-4 pt-4 border-t border-white/5">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest ml-1 text-center">
+                Select Your Domains
               </label>
+              <div className="flex flex-wrap justify-center gap-3">
+                {interests.map((interest) => (
+                  <label key={interest} className="cursor-pointer group">
+                    <input {...register('interests')} type="checkbox" value={interest} className="hidden peer" />
+                    <span className="px-5 py-2.5 rounded-full bg-black/40 border border-white/5 text-xs font-bold text-gray-500 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-500 transition-all inline-block group-hover:border-white/20">
+                      {interest}
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
-            {errors.terms && (
-              <p className="text-sm text-red-400">{errors.terms.message}</p>
-            )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-            >
-              {loading ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Creating account...
-                </div>
-              ) : (
-                'Create account'
-              )}
-            </button>
+            <div className="pt-6 space-y-4">
+              <div className="flex items-center justify-center">
+                <input {...register('terms', { required: true })} type="checkbox" className="h-4 w-4 rounded border-white/10 bg-black text-blue-600" />
+                <label className="ml-3 text-[11px] text-gray-500">
+                  I accept the <button type="button" className="text-white font-bold">Protocol Terms</button> and <button type="button" className="text-white font-bold">Privacy Layer</button>
+                </label>
+              </div>
+
+              <motion.button
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                type="submit"
+                disabled={loading}
+                className="w-full py-5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 disabled:opacity-50 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-2xl shadow-blue-900/30 transition-all flex items-center justify-center gap-3"
+              >
+                {loading ? <><Loader2 className="h-5 w-5 animate-spin" /> Initializing...</> : 'Establish Identity'}
+              </motion.button>
+            </div>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-gray-400">
-              Already have an account?{' '}
-              <Link to="/login" className="font-medium text-cyan-400 hover:text-cyan-300">
-                Sign in here
+          <div className="mt-10 pt-10 border-t border-white/5">
+            <div className="flex flex-col items-center gap-6">
+              <span className="text-[10px] font-black text-gray-600 uppercase tracking-[0.3em]">Neural Bridge Access</span>
+              <div className="w-full max-w-xs flex justify-center">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  useOneTap
+                  theme="filled_black"
+                  shape="pill"
+                  size="large"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-10 text-center">
+            <p className="text-sm text-gray-500">
+              Already registered?{' '}
+              <Link to="/login" className="font-bold text-white hover:text-blue-400 transition-colors">
+                Sign in to your node
               </Link>
             </p>
           </div>
         </motion.div>
       </div>
 
-      {/* Face Training Modal */}
       <FaceTraining
         isOpen={showFaceCapture}
         onComplete={handleFaceTrainingComplete}
         onClose={() => setShowFaceCapture(false)}
+        user={registrationData}
       />
     </div>
   );

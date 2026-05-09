@@ -4,10 +4,12 @@ const User = require('../models/User');
 const Event = require('../models/Event');
 const Booking = require('../models/Booking');
 const Attendance = require('../models/Attendance');
+const Certificate = require('../models/Certificate');
 const { adminAuth } = require('../middleware/auth');
 const { checkSubscription } = require('../middleware/subscription');
 const { generateUserReport, generateEventReport } = require('../utils/excelService');
-const { sendEventNotification } = require('../utils/emailService');
+const { sendEventNotification, sendCertificateEmail } = require('../utils/emailService');
+const CertificateGenerator = require('../utils/certificateGenerator');
 
 const router = express.Router();
 
@@ -520,6 +522,8 @@ router.put('/events/:id', adminAuth, async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
 
+    const previousStatus = event.status; // Capture before updating
+
     // Update event fields
     Object.keys(req.body).forEach(key => {
       if (req.body[key] !== undefined) {
@@ -570,6 +574,70 @@ router.put('/events/:id', adminAuth, async (req, res) => {
     
     
     await event.save();
+
+    // --- AUTO GENERATE CERTIFICATES when event is marked as completed ---
+    if (req.body.status === 'completed' && previousStatus !== 'completed') {
+      setImmediate(async () => {
+        try {
+          const attendances = await Attendance.find({
+            eventId: event._id,
+            status: { $in: ['present', 'late'] }
+          });
+
+          for (const att of attendances) {
+            try {
+              const existing = await Certificate.findOne({ user: att.userId, event: event._id });
+              if (existing) continue;
+
+              const user = await User.findById(att.userId).select('name email');
+              if (!user) continue;
+
+              const cert = new Certificate({
+                user: att.userId,
+                event: event._id,
+                attendance: att._id,
+                title: `Certificate of Participation – ${event.title}`,
+                description: `Awarded to ${user.name} for attending ${event.title}`,
+                validFrom: new Date(),
+                validUntil: new Date(new Date().setFullYear(new Date().getFullYear() + 10)),
+                metadata: {
+                  eventDuration: event.dateTime?.end && event.dateTime?.start
+                    ? (new Date(event.dateTime.end) - new Date(event.dateTime.start)) / (1000 * 60 * 60)
+                    : 0,
+                  attendanceMethod: att.method,
+                  issuedBy: 'Eventra Auto-System',
+                  organization: 'Eventra'
+                }
+              });
+              await cert.save();
+
+              let pdfBuffer = null;
+              try {
+                const generator = new CertificateGenerator();
+                pdfBuffer = await generator.generateCertificate(cert, user, event, att);
+              } catch (e) {
+                console.error('Failed to generate PDF for auto-email:', e.message);
+              }
+
+              // Send certificate email
+              sendCertificateEmail(
+                user.email, user.name, event.title,
+                cert.certificateId, cert.verificationCode,
+                pdfBuffer
+              ).catch(e => console.error('Cert email err:', e.message));
+
+              console.log(`✅ Certificate auto-generated for ${user.email} - ${event.title}`);
+            } catch (certErr) {
+              console.error('Auto-cert error for one user:', certErr.message);
+            }
+          }
+          console.log(`🏆 Auto-certificate generation complete for event: ${event.title}`);
+        } catch (autoErr) {
+          console.error('Auto-certificate generation failed:', autoErr.message);
+        }
+      });
+    }
+    // -----------------------------------------------------------------------
 
     
 

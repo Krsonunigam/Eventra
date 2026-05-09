@@ -343,23 +343,20 @@ router.post('/collect', auth, upload.array('faces', 25), async (req, res) => {
       });
     }
 
-    const uploadedUrls = [];
-
-    for (const file of req.files) {
-      const result = await new Promise((resolve, reject) => {
+    const uploadPromises = req.files.map((file) => {
+      return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
           { folder: 'eventra/faces' },
           (error, result) => {
             if (error) reject(error);
-            else resolve(result);
+            else resolve(result.secure_url);
           }
         );
-
         stream.end(file.buffer);
       });
+    });
 
-      uploadedUrls.push(result.secure_url);
-    }
+    const uploadedUrls = await Promise.all(uploadPromises);
 
     const updatedUser = await User.findByIdAndUpdate(
       req.user.userId,

@@ -99,8 +99,8 @@ const Home = () => {
   ];
 
   const stats = [
-    { number: '10K+', label: 'Events Hosted' },
-    { number: '50K+', label: 'Happy Users' },
+    { number: '10+', label: 'Events Hosted' },
+    { number: '50+', label: 'Happy Users' },
     { number: '99.9%', label: 'Uptime' },
     { number: '24/7', label: 'Support' }
   ];

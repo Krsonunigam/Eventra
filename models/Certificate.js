@@ -56,16 +56,26 @@ const certificateSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
+  verificationUrl: {
+    type: String,
+    default: ''
+  },
+  pdfUrl: {
+    type: String, // Cloudinary or local path
+    default: ''
+  },
   pdfPath: {
     type: String,
     default: ''
   },
   metadata: {
-    eventDuration: Number, // in hours
+    eventDuration: Number,
     attendanceMethod: String,
     confidence: Number,
     issuedBy: String,
-    organization: String
+    organization: String,
+    organizerLogo: String,
+    organizerSignature: String
   },
   isVerified: {
     type: Boolean,
@@ -147,8 +157,8 @@ certificateSchema.statics.generateVerificationCode = function() {
   return result;
 };
 
-// Pre-save middleware to generate IDs if not provided
-certificateSchema.pre('save', function(next) {
+// Pre-validate middleware to generate IDs before validation
+certificateSchema.pre('validate', function(next) {
   if (this.isNew) {
     if (!this.certificateId) {
       this.certificateId = this.constructor.generateCertificateId();

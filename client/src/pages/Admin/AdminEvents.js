@@ -282,12 +282,20 @@ const AdminEvents = () => {
                       </button>
                     )}
                     {event.status === 'published' && (
-                      <button
-                        onClick={() => handleStatusChange(event._id, 'cancelled')}
-                        className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded-lg transition-colors"
-                      >
-                        Cancel
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleStatusChange(event._id, 'completed')}
+                          className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-lg transition-colors"
+                        >
+                          Mark as Completed
+                        </button>
+                        <button
+                          onClick={() => handleStatusChange(event._id, 'cancelled')}
+                          className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </>
                     )}
                     {event.status === 'cancelled' && (
                       <button

@@ -57,6 +57,26 @@ const EventEdit = () => {
         
       }
 
+      // Handle signature upload if present
+      let signatureUrl = eventData?.certificateSignature || '';
+      if (formData.signatureImage && formData.signatureImage instanceof File) {
+        const signatureFormData = new FormData();
+        signatureFormData.append('signatureImage', formData.signatureImage);
+        
+        const signatureResponse = await api.post('/api/upload/signature', signatureFormData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        signatureUrl = signatureResponse.data.url;
+      } else if (formData.signatureImage === null) {
+        signatureUrl = '';
+      }
+
+      if (!signatureUrl && !formData.certificateSignature) {
+        toast.error('Authorized signature is mandatory for certificate generation');
+        setLoading(false);
+        return;
+      }
+
       // Prepare the event data
       const updatedEventData = {
         title: formData.title,
@@ -89,7 +109,8 @@ const EventEdit = () => {
         sponsors: formData.sponsors || [],
         organizerContact: formData.organizerContact || {},
         organizer: eventData?.organizer?._id || eventData?.organizer || formData?.organizer?._id || '',
-        image: imageUrl
+        image: imageUrl,
+        certificateSignature: signatureUrl || formData.certificateSignature
       };
 
       

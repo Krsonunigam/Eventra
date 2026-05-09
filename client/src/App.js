@@ -1,5 +1,6 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './contexts/ToastContext';
@@ -9,6 +10,7 @@ import Events from './pages/Events/Events';
 import EventDetail from './pages/EventDetail/EventDetail';
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
+import ForgotPassword from './pages/Auth/ForgotPassword';
 import FaceVerify from './pages/Auth/FaceVerify';
 import EmailVerification from './components/Auth/EmailVerification';
 import Dashboard from './pages/Dashboard/Dashboard';
@@ -48,11 +50,15 @@ import About from './pages/About/About';
 import Contact from './pages/Contact/Contact';
 import Careers from './pages/Careers/Careers';
 import Certification from './pages/Certification/Certification';
+import MyCertificates from './pages/Certification/MyCertificates';
+import CertificateVerify from './pages/Certification/CertificateVerify';
+import AdminCertificates from './pages/Admin/AdminCertificates';
 
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
+      <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID}>
+        <AuthProvider>
         <ToastProvider>
           <div className="App">
           <Routes>
@@ -62,6 +68,7 @@ function App() {
               <Route path="events/:id" element={<EventDetail />} />
               <Route path="login" element={<Login />} />
               <Route path="register" element={<Register />} />
+              <Route path="forgot-password" element={<ForgotPassword />} />
               <Route path="verify-face" element={<ProtectedRoute><FaceVerify /></ProtectedRoute>} />
               <Route path="verify-email/:token" element={<EmailVerification />} />
               <Route path="verify-email" element={<EmailVerification />} />
@@ -178,6 +185,10 @@ function App() {
               <Route path="contact" element={<Contact />} />
               <Route path="careers" element={<Careers />} />
               <Route path="certification" element={<Certification />} />
+              <Route path="my-certificates" element={<ProtectedRoute><MyCertificates /></ProtectedRoute>} />
+              <Route path="verify-certificate/:code" element={<CertificateVerify />} />
+              <Route path="verify-certificate" element={<CertificateVerify />} />
+              <Route path="admin/certificates" element={<AdminRoute><AdminCertificates /></AdminRoute>} />
               
               {/* Legacy redirects for old paths */}
               <Route path="features/analytics" element={<Analytics />} />
@@ -190,7 +201,8 @@ function App() {
           </Routes>
           </div>
         </ToastProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </GoogleOAuthProvider>
     </ThemeProvider>
   );
 }

@@ -1,387 +1,421 @@
 const express = require('express');
 const router = express.Router();
-const { auth } = require('../middleware/auth');
+const { auth, adminAuth } = require('../middleware/auth');
 const Certificate = require('../models/Certificate');
 const User = require('../models/User');
 const Event = require('../models/Event');
 const Attendance = require('../models/Attendance');
+const Booking = require('../models/Booking');
 const CertificateGenerator = require('../utils/certificateGenerator');
+const { sendCertificateEmail } = require('../utils/emailService');
+const JSZip = require('jszip');
 
-// Generate certificate for completed event
+// ─── HELPER: Core certificate generation logic (reused across routes) ──────────
+async function generateCertificateForUser(userId, eventId, sendEmail = true) {
+  const event = await Event.findById(eventId);
+  if (!event) throw new Error('Event not found');
+
+  const user = await User.findById(userId).select('name email');
+  if (!user) throw new Error('User not found');
+
+  // Check for any verified attendance (present or late)
+  const attendance = await Attendance.findOne({
+    userId,
+    eventId,
+    status: { $in: ['present', 'late'] }
+  });
+  if (!attendance) throw new Error(`No verified attendance found for user ${user.email}`);
+
+  // Skip if already issued
+  const existing = await Certificate.findOne({ user: userId, event: eventId });
+  if (existing) return { certificate: existing, alreadyExisted: true };
+
+  // Create certificate
+  const certificate = new Certificate({
+    user: userId,
+    event: eventId,
+    attendance: attendance._id,
+    title: `Certificate of Participation – ${event.title}`,
+    description: `Awarded to ${user.name} for attending ${event.title}`,
+    validFrom: new Date(),
+    validUntil: new Date(new Date().setFullYear(new Date().getFullYear() + 10)),
+    metadata: {
+      eventDuration: event.dateTime?.end && event.dateTime?.start
+        ? (new Date(event.dateTime.end) - new Date(event.dateTime.start)) / (1000 * 60 * 60)
+        : 0,
+      attendanceMethod: attendance.method,
+      issuedBy: 'Eventra Auto-System',
+      organization: 'Eventra'
+    }
+  });
+
+  await certificate.save();
+
+  // Send email asynchronously (don't block response)
+  if (sendEmail) {
+    let pdfBuffer = null;
+    try {
+      const generator = new CertificateGenerator();
+      pdfBuffer = await generator.generateCertificate(certificate, user, event, attendance);
+    } catch (e) {
+      console.error('Failed to generate PDF for email:', e.message);
+    }
+
+    sendCertificateEmail(
+      user.email,
+      user.name,
+      event.title,
+      certificate.certificateId,
+      certificate.verificationCode,
+      pdfBuffer
+    ).catch(err => console.error('Certificate email error:', err.message));
+  }
+
+  return { certificate, alreadyExisted: false };
+}
+
+// ─── USER: Generate my certificate for an event ───────────────────────────────
 router.post('/generate', auth, async (req, res) => {
   try {
-    const { eventId, attendanceId } = req.body;
-    const userId = req.user.userId;
+    const { eventId } = req.body;
+    if (!eventId) return res.status(400).json({ success: false, message: 'eventId is required' });
 
-    // Validate required fields
-    if (!eventId || !attendanceId) {
-      return res.status(400).json({
-        message: 'Event ID and Attendance ID are required',
-        success: false
-      });
-    }
-
-    // Verify attendance exists and belongs to user
-    const attendance = await Attendance.findById(attendanceId)
-      .populate('eventId')
-      .populate('userId');
-
-    if (!attendance) {
-      return res.status(404).json({
-        message: 'Attendance record not found',
-        success: false
-      });
-    }
-
-    if (attendance.userId._id.toString() !== userId.toString()) {
-      return res.status(403).json({
-        message: 'Access denied. This attendance does not belong to you.',
-        success: false
-      });
-    }
-
-    if (attendance.eventId._id.toString() !== eventId.toString()) {
-      return res.status(400).json({
-        message: 'Attendance does not match the specified event',
-        success: false
-      });
-    }
-
-    // Check if event is completed
-    const event = await Event.findById(eventId);
-    if (!event) {
-      return res.status(404).json({
-        message: 'Event not found',
-        success: false
-      });
-    }
-
-    const now = new Date();
-    const eventEnd = new Date(event.dateTime.end);
-    
-    if (now < eventEnd) {
-      return res.status(400).json({
-        message: 'Event has not completed yet. Certificate can only be generated after event completion.',
-        success: false,
-        eventEndsAt: eventEnd.toISOString()
-      });
-    }
-
-    // Check if certificate already exists
-    const existingCertificate = await Certificate.findOne({
-      user: userId,
-      event: eventId,
-      attendance: attendanceId
-    });
-
-    if (existingCertificate) {
-      return res.status(400).json({
-        message: 'Certificate already exists for this attendance',
-        success: false,
-        certificate: {
-          id: existingCertificate._id,
-          certificateId: existingCertificate.certificateId,
-          certificateNumber: existingCertificate.certificateNumber
-        }
-      });
-    }
-
-    // Create certificate
-    const certificate = new Certificate({
-      user: userId,
-      event: eventId,
-      attendance: attendanceId,
-      title: `Certificate of Completion - ${event.title}`,
-      description: `This certificate is awarded to ${attendance.userId.name} for successful completion of ${event.title} held on ${new Date(event.dateTime.start).toLocaleDateString()}.`,
-      validFrom: new Date(),
-      validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // Valid for 1 year
-      metadata: {
-        eventDuration: (new Date(event.dateTime.end) - new Date(event.dateTime.start)) / (1000 * 60 * 60),
-        attendanceMethod: attendance.method,
-        confidence: attendance.confidence || 1.0,
-        issuedBy: 'Eventra Platform',
-        organization: 'Eventra'
-      }
-    });
-
-    await certificate.save();
-
-    // Generate PDF
-    const certificateGenerator = new CertificateGenerator();
-    const pdfBuffer = await certificateGenerator.generateCertificate(
-      certificate,
-      attendance.userId,
-      event,
-      attendance
-    );
-
-    // Save PDF to file system (optional)
-    const fs = require('fs');
-    const path = require('path');
-    const uploadsDir = path.join(__dirname, '..', 'uploads', 'certificates');
-    
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-
-    const pdfFileName = `certificate-${certificate.certificateId}.pdf`;
-    const pdfPath = path.join(uploadsDir, pdfFileName);
-    
-    fs.writeFileSync(pdfPath, pdfBuffer);
-    certificate.pdfPath = pdfPath;
-    await certificate.save();
+    const { certificate, alreadyExisted } = await generateCertificateForUser(req.user.userId, eventId);
 
     res.json({
       success: true,
-      message: 'Certificate generated successfully',
-      certificate: {
-        id: certificate._id,
-        certificateId: certificate.certificateId,
-        certificateNumber: certificate.certificateNumber,
-        title: certificate.title,
-        issuedDate: certificate.issuedDate,
-        validUntil: certificate.validUntil,
-        verificationCode: certificate.verificationCode,
-        pdfPath: `/api/certificates/${certificate._id}/download`
-      }
+      message: alreadyExisted ? 'Certificate already exists' : 'Certificate generated successfully! Check your email.',
+      certificate
     });
-
   } catch (error) {
-    
-    res.status(500).json({
-      message: 'Certificate generation failed',
-      error: error.message,
-      success: false
-    });
+    console.error('Certificate generate error:', error.message);
+    res.status(400).json({ success: false, message: error.message });
   }
 });
 
-// Download certificate PDF
-router.get('/:id/download', auth, async (req, res) => {
+// ─── USER: Get my certificates ────────────────────────────────────────────────
+router.get('/my-certificates', auth, async (req, res) => {
   try {
-    const certificateId = req.params.id;
-    const userId = req.user.userId;
+    const certificates = await Certificate.find({ user: req.user.userId })
+      .populate('event', 'title dateTime venue image category')
+      .populate('attendance', 'method timestamp status')
+      .sort({ createdAt: -1 });
 
-    const certificate = await Certificate.findById(certificateId)
-      .populate('user')
+    res.json({ success: true, certificates });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to fetch certificates' });
+  }
+});
+
+// ─── USER / ADMIN: Download certificate PDF ───────────────────────────────────
+router.get('/download/:id', auth, async (req, res) => {
+  try {
+    const certificate = await Certificate.findById(req.params.id)
+      .populate('user', 'name email')
       .populate('event')
       .populate('attendance');
 
+    if (!certificate) return res.status(404).json({ message: 'Certificate not found' });
+
+    if (
+      certificate.user._id.toString() !== req.user.userId.toString() &&
+      req.user.role !== 'admin'
+    ) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const generator = new CertificateGenerator();
+    const pdfBuffer = await generator.generateCertificate(
+      certificate,
+      certificate.user,
+      certificate.event,
+      certificate.attendance
+    );
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=Certificate_${certificate.certificateId}.pdf`
+    );
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('PDF download error:', error.message);
+    res.status(500).json({ message: 'Failed to generate PDF' });
+  }
+});
+
+// ─── PUBLIC: Verify certificate by ID (Manual Input) ────────────────────────
+router.get('/verify-id/:id', async (req, res) => {
+  try {
+    const certificate = await Certificate.findOne({ 
+      $or: [
+        { certificateId: req.params.id },
+        { verificationCode: req.params.id }
+      ]
+    })
+    .populate('user', 'name email studentId institute')
+    .populate('event', 'title dateTime venue category');
+
     if (!certificate) {
-      return res.status(404).json({
-        message: 'Certificate not found',
-        success: false
-      });
+      return res.status(404).json({ success: false, message: 'Certificate not found' });
     }
 
-    // Check if user owns this certificate
-    if (certificate.user._id.toString() !== userId.toString()) {
-      return res.status(403).json({
-        message: 'Access denied. This certificate does not belong to you.',
-        success: false
-      });
+    // Optional authentication check for masking
+    let isOwnerOrAdmin = false;
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      try {
+        const token = authHeader.replace('Bearer ', '');
+        const decoded = require('jsonwebtoken').verify(token, process.env.JWT_SECRET);
+        if (decoded.role === 'admin' || decoded.userId === certificate.user._id.toString()) {
+          isOwnerOrAdmin = true;
+        }
+      } catch (err) {
+        // Token invalid, treat as public
+      }
     }
 
-    // Generate PDF if not exists
-    if (!certificate.pdfPath || !require('fs').existsSync(certificate.pdfPath)) {
-      const certificateGenerator = new CertificateGenerator();
-      const pdfBuffer = await certificateGenerator.generateCertificate(
+    const maskName = (name) => {
+      if (isOwnerOrAdmin) return name;
+      const parts = name.split(' ');
+      return parts.map(p => p[0] + '*'.repeat(p.length - 1)).join(' ');
+    };
+
+    res.json({
+      success: true,
+      data: {
+        certificateId: certificate.certificateId,
+        recipient: maskName(certificate.user.name),
+        event: certificate.event.title,
+        eventDate: certificate.event.dateTime?.start,
+        venue: certificate.event.venue?.name,
+        category: certificate.event.category,
+        issuedAt: certificate.createdAt,
+        status: certificate.status,
+        isValid: certificate.status === 'active',
+        // Full details only if authenticated owner/admin
+        fullDetails: isOwnerOrAdmin ? {
+          email: certificate.user.email,
+          studentId: certificate.user.studentId,
+          institute: certificate.user.institute,
+          verificationCode: certificate.verificationCode
+        } : null
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Verification error' });
+  }
+});
+
+// ─── PUBLIC: Verify certificate by code (QR Scan) ─────────────────────────────
+router.get('/verify/:code', async (req, res) => {
+  try {
+    const certificate = await Certificate.findOne({ verificationCode: req.params.code })
+      .populate('user', 'name email')
+      .populate('event', 'title dateTime venue category');
+
+    if (!certificate) {
+      return res.status(404).json({ success: false, message: 'Invalid or expired verification code' });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        certificateId: certificate.certificateId,
+        recipient: certificate.user.name,
+        event: certificate.event.title,
+        eventDate: certificate.event.dateTime?.start,
+        venue: certificate.event.venue?.name,
+        issuedAt: certificate.createdAt,
+        status: certificate.status,
+        isValid: certificate.status === 'active'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Verification error' });
+  }
+});
+
+// ─── ADMIN: Get all certificates ──────────────────────────────────────────────
+router.get('/admin/all', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin access required' });
+
+    const { search, eventId } = req.query;
+    let query = {};
+    if (eventId) query.event = eventId;
+
+    let certificates = await Certificate.find(query)
+      .populate('user', 'name email institute studentId')
+      .populate('event', 'title dateTime venue')
+      .sort({ createdAt: -1 });
+
+    // Apply search filter after population
+    if (search) {
+      const s = search.toLowerCase();
+      certificates = certificates.filter(c =>
+        c.user?.name?.toLowerCase().includes(s) ||
+        c.user?.email?.toLowerCase().includes(s) ||
+        c.event?.title?.toLowerCase().includes(s) ||
+        c.certificateId?.toLowerCase().includes(s)
+      );
+    }
+
+    res.json({ success: true, certificates });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Admin fetch error' });
+  }
+});
+
+// ─── ADMIN: Bulk generate certificates for all attendees of an event ──────────
+router.post('/admin/generate-for-event/:eventId', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin access required' });
+
+    const { eventId } = req.params;
+    const event = await Event.findById(eventId);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    // Find all attendees with present/late status
+    const attendances = await Attendance.find({
+      eventId,
+      status: { $in: ['present', 'late'] }
+    });
+
+    if (attendances.length === 0) {
+      return res.status(400).json({ success: false, message: 'No verified attendees found for this event.' });
+    }
+
+    const results = { generated: [], alreadyExisted: [], failed: [] };
+
+    for (const att of attendances) {
+      try {
+        const { certificate, alreadyExisted } = await generateCertificateForUser(att.userId, eventId, true);
+        if (alreadyExisted) {
+          results.alreadyExisted.push(att.userId.toString());
+        } else {
+          results.generated.push(certificate.certificateId);
+        }
+      } catch (err) {
+        results.failed.push({ userId: att.userId.toString(), reason: err.message });
+      }
+    }
+
+    // Mark event as completed
+    if (event.status !== 'completed') {
+      event.status = 'completed';
+      await event.save();
+    }
+
+    res.json({
+      success: true,
+      message: `Certificates processed. New: ${results.generated.length}, Already existed: ${results.alreadyExisted.length}, Failed: ${results.failed.length}`,
+      results
+    });
+  } catch (error) {
+    console.error('Bulk generate error:', error.message);
+    res.status(500).json({ message: 'Bulk generation failed', error: error.message });
+  }
+});
+
+// ─── ADMIN: Resend certificate email ──────────────────────────────────────────
+router.post('/admin/resend-email/:certId', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin access required' });
+
+    const certificate = await Certificate.findById(req.params.certId)
+      .populate('user', 'name email')
+      .populate('event')
+      .populate('attendance');
+
+    if (!certificate) return res.status(404).json({ message: 'Certificate not found' });
+
+    let pdfBuffer = null;
+    try {
+      const generator = new CertificateGenerator();
+      pdfBuffer = await generator.generateCertificate(
         certificate,
         certificate.user,
         certificate.event,
         certificate.attendance
       );
-
-      // Save PDF
-      const fs = require('fs');
-      const path = require('path');
-      const uploadsDir = path.join(__dirname, '..', 'uploads', 'certificates');
-      
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
-      }
-
-      const pdfFileName = `certificate-${certificate.certificateId}.pdf`;
-      const pdfPath = path.join(uploadsDir, pdfFileName);
-      
-      fs.writeFileSync(pdfPath, pdfBuffer);
-      certificate.pdfPath = pdfPath;
-      await certificate.save();
-
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="certificate-${certificate.certificateId}.pdf"`);
-      res.send(pdfBuffer);
-    } else {
-      // Send existing PDF
-      res.download(certificate.pdfPath, `certificate-${certificate.certificateId}.pdf`);
+    } catch (e) {
+      console.error('Failed to generate PDF for resend:', e.message);
     }
 
+    await sendCertificateEmail(
+      certificate.user.email,
+      certificate.user.name,
+      certificate.event.title,
+      certificate.certificateId,
+      certificate.verificationCode,
+      pdfBuffer
+    );
+
+    res.json({ success: true, message: `Certificate email resent to ${certificate.user.email}` });
   } catch (error) {
-    
-    res.status(500).json({
-      message: 'Certificate download failed',
-      error: error.message,
-      success: false
-    });
+    res.status(500).json({ message: 'Failed to resend email', error: error.message });
   }
 });
 
-// Get user's certificates
-router.get('/my-certificates', auth, async (req, res) => {
+// ─── ADMIN: Bulk download ZIP ─────────────────────────────────────────────────
+router.get('/admin/bulk-download/:eventId', auth, async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const { page = 1, limit = 10, status } = req.query;
-    const skip = (page - 1) * limit;
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin access required' });
 
-    const query = { user: userId };
-    if (status) {
-      query.status = status;
-    }
+    const event = await Event.findById(req.params.eventId);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
 
-    const certificates = await Certificate.find(query)
-      .populate('event', 'title dateTime venue')
-      .populate('attendance', 'method timestamp')
-      .sort({ issuedDate: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Certificate.countDocuments(query);
-
-    res.json({
-      success: true,
-      certificates,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit)
-      }
-    });
-
-  } catch (error) {
-    
-    res.status(500).json({
-      message: 'Failed to fetch certificates',
-      error: error.message,
-      success: false
-    });
-  }
-});
-
-// Verify certificate
-router.get('/verify/:verificationCode', async (req, res) => {
-  try {
-    const { verificationCode } = req.params;
-
-    const certificate = await Certificate.findOne({ verificationCode })
+    const certificates = await Certificate.find({ event: req.params.eventId })
       .populate('user', 'name email')
-      .populate('event', 'title dateTime venue')
-      .populate('attendance', 'method timestamp');
+      .populate('event')
+      .populate('attendance');
 
-    if (!certificate) {
-      return res.status(404).json({
-        message: 'Certificate not found or invalid verification code',
-        success: false
-      });
+    if (certificates.length === 0) {
+      return res.status(404).json({ message: 'No certificates found for this event' });
     }
 
-    // Check if certificate is valid
-    const now = new Date();
-    const isValid = certificate.status === 'active' && 
-                   certificate.validFrom <= now && 
-                   certificate.validUntil >= now;
+    const zip = new JSZip();
+    const generator = new CertificateGenerator();
 
-    res.json({
-      success: true,
-      certificate: {
-        id: certificate._id,
-        certificateId: certificate.certificateId,
-        certificateNumber: certificate.certificateNumber,
-        title: certificate.title,
-        recipient: certificate.user.name,
-        event: {
-          title: certificate.event.title,
-          date: certificate.event.dateTime.start,
-          venue: certificate.event.venue.name
-        },
-        attendance: {
-          method: certificate.attendance.method,
-          timestamp: certificate.attendance.timestamp
-        },
-        issuedDate: certificate.issuedDate,
-        validFrom: certificate.validFrom,
-        validUntil: certificate.validUntil,
-        status: certificate.status,
-        isValid: isValid,
-        isVerified: certificate.isVerified
+    for (const cert of certificates) {
+      try {
+        const pdfBuffer = await generator.generateCertificate(cert, cert.user, cert.event, cert.attendance);
+        zip.file(`${cert.user.name.replace(/\s+/g, '_')}_${cert.certificateId}.pdf`, pdfBuffer);
+      } catch (err) {
+        console.error(`PDF gen failed for ${cert.user?.name}:`, err.message);
       }
-    });
+    }
 
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename=Certificates_${event.title.replace(/\s+/g, '_')}.zip`);
+    res.send(zipBuffer);
   } catch (error) {
-    
-    res.status(500).json({
-      message: 'Certificate verification failed',
-      error: error.message,
-      success: false
-    });
+    console.error('Bulk download error:', error.message);
+    res.status(500).json({ message: 'Bulk download failed' });
   }
 });
 
-// Get certificate by ID
-router.get('/:id', auth, async (req, res) => {
+// ─── ADMIN: Revoke a certificate ──────────────────────────────────────────────
+router.put('/admin/revoke/:certId', auth, async (req, res) => {
   try {
-    const certificateId = req.params.id;
-    const userId = req.user.userId;
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin access required' });
 
-    const certificate = await Certificate.findById(certificateId)
-      .populate('user', 'name email')
-      .populate('event', 'title dateTime venue')
-      .populate('attendance', 'method timestamp');
+    const certificate = await Certificate.findByIdAndUpdate(
+      req.params.certId,
+      { status: 'revoked' },
+      { new: true }
+    );
 
-    if (!certificate) {
-      return res.status(404).json({
-        message: 'Certificate not found',
-        success: false
-      });
-    }
+    if (!certificate) return res.status(404).json({ message: 'Certificate not found' });
 
-    // Check if user owns this certificate
-    if (certificate.user._id.toString() !== userId.toString()) {
-      return res.status(403).json({
-        message: 'Access denied. This certificate does not belong to you.',
-        success: false
-      });
-    }
-
-    res.json({
-      success: true,
-      certificate: {
-        id: certificate._id,
-        certificateId: certificate.certificateId,
-        certificateNumber: certificate.certificateNumber,
-        title: certificate.title,
-        description: certificate.description,
-        event: certificate.event,
-        attendance: certificate.attendance,
-        issuedDate: certificate.issuedDate,
-        validFrom: certificate.validFrom,
-        validUntil: certificate.validUntil,
-        status: certificate.status,
-        verificationCode: certificate.verificationCode,
-        metadata: certificate.metadata,
-        isVerified: certificate.isVerified,
-        verifiedAt: certificate.verifiedAt,
-        downloadUrl: `/api/certificates/${certificate._id}/download`
-      }
-    });
-
+    res.json({ success: true, message: 'Certificate revoked', certificate });
   } catch (error) {
-    
-    res.status(500).json({
-      message: 'Failed to fetch certificate',
-      error: error.message,
-      success: false
-    });
+    res.status(500).json({ message: 'Failed to revoke certificate' });
   }
 });
 
