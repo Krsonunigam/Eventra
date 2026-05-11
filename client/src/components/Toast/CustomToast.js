@@ -41,7 +41,8 @@ const CustomToast = ({ t, message, type, title, style }) => {
             type: 'spring', 
             damping: 22, 
             stiffness: 260,
-            mass: 1
+            mass: 1,
+            filter: { type: 'tween', duration: 0.3 } // Avoid spring overshoot for filter
           }}
           className={`${border} border-l-4 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-2xl pointer-events-auto flex ring-1 ring-white/10 max-w-md w-full backdrop-blur-2xl transition-shadow duration-300`}
           style={{ 

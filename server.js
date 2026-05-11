@@ -23,23 +23,38 @@ app.use((req, res, next) => {
 });
 
 // ── CORS ─────────────────────────────────────────────────────────────────────
+// ── CORS ─────────────────────────────────────────────────────────────────────
 const allowedOrigins = [
   'http://127.0.0.1:3000',
   'http://localhost:3000',
   'https://eventra-jet.vercel.app',
-  'https://eventraind.onrender.com',
   process.env.CLIENT_URL
-].filter(Boolean);
+].map(o => o?.replace(/\/$/, '')).filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true);               // Postman / curl
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    // 1. Allow requests with no origin (like mobile apps)
+    if (!origin) return callback(null, true);
+    
+    const cleanOrigin = origin.replace(/\/$/, '');
+
+    // 2. Allow exact matches
+    if (allowedOrigins.includes(cleanOrigin)) {
+      return callback(null, true);
+    }
+
+    // 3. Allow any .onrender.com subdomain (very common for Render deployments)
+    if (cleanOrigin.endsWith('.onrender.com')) {
+      return callback(null, true);
+    }
+
+    console.warn(`⚠️ [CORS] Blocked origin: ${origin}`);
     callback(new Error(`CORS: ${origin} not allowed`));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with', 'Accept'],
+  exposedHeaders: ['set-cookie']
 }));
 
 // Handle pre-flight for every route
