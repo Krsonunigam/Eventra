@@ -44,7 +44,16 @@ const uploadBufferToCloudinary = (buffer, folder = 'eventra/faces') => {
 // Cloudinary in parallel, and updates the user document with {url, public_id}.
 router.post('/collect', auth, upload.array('faces', 25), async (req, res) => {
   try {
-    if (!req.files || req.files.length < 10) {
+    console.log(`[FaceCollect] Received request from User: ${req.user.userId}`);
+    
+    if (!req.files || req.files.length === 0) {
+      console.warn('[FaceCollect] No files received');
+      return res.status(400).json({ success: false, message: 'No face samples received' });
+    }
+
+    console.log(`[FaceCollect] Processing ${req.files.length} images...`);
+
+    if (req.files.length < 10) {
       return res.status(400).json({
         success: false,
         message: 'At least 10 face samples are required'
@@ -57,74 +66,96 @@ router.post('/collect', auth, upload.array('faces', 25), async (req, res) => {
 
     try {
       trainingResult = await storeFaceData(req.user.userId, faceBuffers);
-      if (!trainingResult.success) {
-        return res.status(400).json({
-          success: false,
-          message: trainingResult.message || 'Face training failed'
-        });
-      }
+      console.log(`[FaceCollect] Training result: ${JSON.stringify(trainingResult)}`);
     } catch (trainErr) {
-      console.error('⚠️ Face training error (non-fatal, continuing upload):', trainErr.message);
-      // Training failure should not block Cloudinary upload
+      console.error('⚠️ [FaceCollect] Face training error (continuing):', trainErr.message);
     }
 
     // 2. Upload all face images to Cloudinary in parallel
+    console.log('[FaceCollect] Uploading to Cloudinary...');
     const uploadResults = await Promise.all(
-      req.files.map(file => uploadBufferToCloudinary(file.buffer))
+      req.files.map((file, idx) => {
+        return uploadBufferToCloudinary(file.buffer).catch(err => {
+          console.error(`[FaceCollect] Failed to upload image ${idx}:`, err.message);
+          return null; // Handle partial failure
+        });
+      })
     );
-    // uploadResults is now: [{ url, public_id }, ...]
 
-    // 3. Update user document with correct schema format
-    const updatedUser = await User.findByIdAndUpdate(
-      req.user.userId,
-      {
-        $set: {
-          faceImages: uploadResults,            // [{url, public_id}] ✅
-          faceDataCollected: true,
-          faceTrainingCompleted: true,
-          isFaceVerified: true,
-          faceSampleCount: uploadResults.length,
-          faceDataQuality: trainingResult.quality || 'high',
-          faceTrainingDate: new Date()
-        }
-      },
-      { new: true, runValidators: true }
-    ).select('-password -faceData -base64Images -resetPasswordOTP -resetPasswordExpires');
+    // Filter out any failed uploads
+    const successfulUploads = uploadResults.filter(res => res !== null);
+    console.log(`[FaceCollect] Uploaded ${successfulUploads.length}/${req.files.length} images.`);
 
-    if (!updatedUser) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+    if (successfulUploads.length < 5) {
+      return res.status(500).json({ success: false, message: 'Cloudinary upload failed for most samples' });
     }
 
-    // 4. Build a clean user object to send back to the frontend
-    const userPayload = {
-      id: updatedUser._id,
-      name: updatedUser.name,
-      email: updatedUser.email,
-      role: updatedUser.role,
-      isActive: updatedUser.isActive,
-      emailVerified: updatedUser.emailVerified,
-      profilePicture: updatedUser.profilePicture,
-      studentId: updatedUser.studentId,
-      institute: updatedUser.institute,
-      phoneNumber: updatedUser.phoneNumber,
-      faceDataCollected: updatedUser.faceDataCollected,
-      faceTrainingCompleted: updatedUser.faceTrainingCompleted,
-      isFaceVerified: updatedUser.isFaceVerified,
-      faceSampleCount: updatedUser.faceSampleCount,
-      faceDataQuality: updatedUser.faceDataQuality,
-      faceTrainingDate: updatedUser.faceTrainingDate,
-      faceImages: updatedUser.faceImages
-    };
+    // 3. Update user document with correct schema format
+    console.log('[FaceCollect] Updating user document...');
+    
+    // TRIPLE CHECK: Ensure we are sending an array of objects
+    // successfulUploads is already [{url, public_id}, ...]
+    
+    try {
+      const updatedUser = await User.findByIdAndUpdate(
+        req.user.userId,
+        {
+          $set: {
+            faceImages: successfulUploads,            // [{url, public_id}]
+            faceDataCollected: true,
+            faceTrainingCompleted: true,
+            isFaceVerified: true,
+            faceSampleCount: successfulUploads.length,
+            faceDataQuality: trainingResult.quality || 'high',
+            faceTrainingDate: new Date()
+          }
+        },
+        { new: true, runValidators: true }
+      ).select('-password -faceData -base64Images -resetPasswordOTP -resetPasswordExpires');
 
-    return res.json({
-      success: true,
-      message: 'Face training completed successfully',
-      sampleCount: updatedUser.faceSampleCount,
-      user: userPayload
-    });
+      if (!updatedUser) {
+        console.error('[FaceCollect] User not found during update');
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+
+      console.log(`[FaceCollect] User ${updatedUser.email} updated successfully with ${successfulUploads.length} samples.`);
+
+      // 4. Build a clean user object
+      const userPayload = {
+        id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        faceDataCollected: updatedUser.faceDataCollected,
+        faceTrainingCompleted: updatedUser.faceTrainingCompleted,
+        isFaceVerified: updatedUser.isFaceVerified,
+        faceSampleCount: updatedUser.faceSampleCount,
+        faceImages: updatedUser.faceImages
+      };
+
+      return res.json({
+        success: true,
+        message: 'Face training completed successfully',
+        sampleCount: updatedUser.faceSampleCount,
+        user: userPayload
+      });
+
+    } catch (dbErr) {
+      console.error('❌ [FaceCollect] MongoDB Update Error:', dbErr);
+      
+      // Check if it's a CastError on faceImages
+      if (dbErr.name === 'ValidationError' || dbErr.name === 'CastError') {
+        return res.status(500).json({
+          success: false,
+          message: `Database Schema Error: ${dbErr.message}. Please contact support.`,
+          error: dbErr.name
+        });
+      }
+      throw dbErr;
+    }
 
   } catch (err) {
-    console.error('❌ /api/face/collect error:', err);
+    console.error('❌ [FaceCollect] Global error:', err);
     return res.status(500).json({
       success: false,
       message: err.message || 'Internal server error during face upload'

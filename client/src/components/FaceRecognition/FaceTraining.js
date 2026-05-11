@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import useCustomToast from '../../utils/customToast';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 
 const REQUIRED_SAMPLES = 25;
 const CAPTURE_INTERVAL_MS = 800; // ms between captures
@@ -124,9 +125,7 @@ const FaceTraining = ({ isOpen, onComplete, onClose }) => {
       const formData = new FormData();
       samples.forEach((img, i) => formData.append('faces', img, `face_${i}.jpg`));
 
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-
-      const response = await axios.post(`${apiUrl}/api/face/collect`, formData, {
+      const response = await axios.post(`${API_BASE_URL}/api/face/collect`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           Authorization: `Bearer ${localStorage.getItem('token')}`
