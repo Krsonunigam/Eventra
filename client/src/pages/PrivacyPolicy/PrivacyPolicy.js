@@ -260,7 +260,7 @@ const PrivacyPolicy = () => {
               <Mail className="h-5 w-5 text-white mr-3" />
               <div>
                 <div className="font-medium text-white">Email</div>
-                <div className="text-gray-300">aieventra@icloud.com</div>
+                <div className="text-gray-300">eventraofficialevent@gmail.com</div>
               </div>
             </div>
             <div className="flex items-center">

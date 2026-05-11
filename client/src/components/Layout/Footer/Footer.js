@@ -130,7 +130,7 @@ const Footer = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex items-center space-x-2 text-gray-400">
               <Mail className="h-4 w-4" />
-              <span className="text-sm">  aieventra@icloud.com  </span>
+              <span className="text-sm">  eventraofficialevent@gmail.com  </span>
             </div>
             <div className="flex items-center space-x-2 text-gray-400">
               <Phone className="h-4 w-4" />

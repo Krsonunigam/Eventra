@@ -290,7 +290,7 @@ const TermsOfService = () => {
               </p>
               <div className="bg-blue-50 p-4 rounded-lg">
                 <p className="text-blue-800 text-sm">
-                  <strong>Support:</strong>aieventra@icloud.com<br />
+                  <strong>Support:</strong>eventraofficialevent@gmail.com<br />
                   <strong>Response Time:</strong> Within 48 hours
                 </p>
               </div>
@@ -324,7 +324,7 @@ const TermsOfService = () => {
           <div className="grid md:grid-cols-3 gap-6">
             <div>
               <div className="font-semibold mb-1">Email</div>
-              <div className="text-blue-100">aieventra@icloud.com</div>
+              <div className="text-blue-100">eventraofficialevent@gmail.com</div>
             </div>
             <div>
               <div className="font-semibold mb-1">Phone</div>

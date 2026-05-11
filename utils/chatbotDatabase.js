@@ -451,7 +451,7 @@ const chatbotDatabase = {
     {
       keywords: ['contact support', 'help desk', 'customer service', 'get help'],
       question: "How do I contact support?",
-      answer: "You can contact our support team through the 'Contact Us' page, email aieventra@icloud.com, or use this chatbot for immediate assistance with common issues.",
+      answer: "You can contact our support team through the 'Contact Us' page, email eventraofficialevent@gmail.com, or use this chatbot for immediate assistance with common issues.",
       apiEndpoint: null,
       category: "Support"
     },

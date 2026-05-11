@@ -142,7 +142,7 @@ const HelpCenter = () => {
       icon: Mail,
       title: 'Email Support',
       description: 'Send us a detailed message',
-      action: 'aieventra@icloud.com',
+      action: 'eventraofficialevent@gmail.com',
       color: 'from-green-500 to-green-600'
     },
     {
