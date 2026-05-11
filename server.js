@@ -27,6 +27,7 @@ const allowedOrigins = [
   'http://127.0.0.1:3000',
   'http://localhost:3000',
   'https://eventra-jet.vercel.app',
+  'https://eventraind.onrender.com',
   process.env.CLIENT_URL
 ].filter(Boolean);
 
