@@ -56,6 +56,7 @@ import CertificateVerify from './pages/Certification/CertificateVerify';
 import AdminCertificates from './pages/Admin/AdminCertificates';
 
 import ScrollToTop from './components/ScrollToTop';
+import FaceTest from './pages/FaceTest/FaceTest';
 
 function App() {
   return (
@@ -199,7 +200,14 @@ function App() {
               <Route path="verify-certificate/:code" element={<CertificateVerify />} />
               <Route path="verify-certificate" element={<CertificateVerify />} />
               <Route path="admin/certificates" element={<AdminRoute><AdminCertificates /></AdminRoute>} />
-              
+
+              {/* Face Test / Setup page */}
+              <Route path="face-test" element={
+                <ProtectedRoute>
+                  <FaceTest />
+                </ProtectedRoute>
+              } />
+
               {/* Legacy redirects for old paths */}
               <Route path="features/analytics" element={<Analytics />} />
               <Route path="features/events" element={<EventManagement />} />

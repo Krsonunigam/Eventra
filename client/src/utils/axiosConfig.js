@@ -1,53 +1,55 @@
 import axios from 'axios';
-
 import { API_BASE_URL } from '../config/api';
 
-// Configure axios base URL
-// const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
-
-// Create axios instance with base URL
+// Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  timeout: 30000, // 30s default — face uploads override this per-request
+  headers: { 'Content-Type': 'application/json' }
 });
 
-// Request interceptor to add auth token
+// ── Request interceptor: attach JWT token ─────────────────────────────────
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Give multipart face uploads a much longer timeout
+    if (config.headers['Content-Type']?.includes('multipart/form-data')) {
+      config.timeout = 120000; // 2 min for face uploads
+    }
+
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor for error handling
+// ── Response interceptor: handle auth errors ──────────────────────────────
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Only redirect to login if it's not a face recognition related request
       const url = error.config?.url || '';
-      const isFaceRelated = url.includes('/api/face') || url.includes('/api/auth/me');
-      
-      if (!isFaceRelated) {
-        // Token expired or invalid
+      // Don't redirect for face-related endpoints or /me (let callers handle it)
+      const skipRedirect = url.includes('/api/face') || url.includes('/api/auth/me');
+
+      if (!skipRedirect) {
         localStorage.removeItem('token');
         window.location.href = '/login';
       }
     }
+
+    // Surface a clean error message
+    const message =
+      error.response?.data?.message ||
+      error.message ||
+      'An unexpected error occurred';
+
+    error.userMessage = message;
     return Promise.reject(error);
   }
 );
 
 export default api;
-

@@ -6,24 +6,23 @@ const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-const paymentRoutes = require("./routes/paymentRoutes");
 
 // Set timezone to IST
 process.env.TZ = 'Asia/Kolkata';
 
-
-
-
 const app = express();
 
-// Increase server timeout for large requests
+// ── Trust proxy (Render/Railway sit behind a load balancer) ─────────────────
+app.set('trust proxy', 1);
+
+// ── Increase request/response timeouts for large face uploads ────────────────
 app.use((req, res, next) => {
-  req.setTimeout(300000); // 5 minutes
-  res.setTimeout(300000); // 5 minutes
+  req.setTimeout(300_000);  // 5 min
+  res.setTimeout(300_000);
   next();
 });
 
-// CORS configuration - Allow localhost + Vercel production
+// ── CORS ─────────────────────────────────────────────────────────────────────
 const allowedOrigins = [
   'http://127.0.0.1:3000',
   'http://localhost:3000',
@@ -33,163 +32,160 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (Postman, server-to-server)
-    if (!origin) return callback(null, true);
+    if (!origin) return callback(null, true);               // Postman / curl
     if (allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error('Not allowed by CORS'));
+    callback(new Error(`CORS: ${origin} not allowed`));
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with']
 }));
 
-// Security middleware
-// Trust the proxy (e.g., CRA dev server) so rate limiter can read X-Forwarded-For safely
-app.set('trust proxy', 1);
-// Configure Helmet for development
-if (process.env.NODE_ENV === 'development') {
-  app.use(helmet({
-    contentSecurityPolicy: false, // Disable CSP in development
-    crossOriginEmbedderPolicy: false,
-    crossOriginOpenerPolicy: false,
-    crossOriginResourcePolicy: false
-  }));
-} else {
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "blob:", "http://localhost:5000"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https:"],
-        scriptSrc: ["'self'"],
-        objectSrc: ["'none'"],
-        upgradeInsecureRequests: [],
-      },
-    },
-  }));
-}
-app.use(compression());
+// Handle pre-flight for every route
+app.options('*', cors());
 
-// Rate limiting - Disabled for development
+// ── Security headers ─────────────────────────────────────────────────────────
+app.use(helmet({
+  contentSecurityPolicy: false,       // React handles its own CSP
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: false,
+  crossOriginResourcePolicy: false
+}));
+
+// ── gzip compression (skip for multipart/form-data) ─────────────────────────
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['content-type']?.includes('multipart/form-data')) return false;
+    return compression.filter(req, res);
+  },
+  level: 6   // balanced speed/size
+}));
+
+// ── Rate limiting (production only) ──────────────────────────────────────────
 if (process.env.NODE_ENV !== 'development') {
   const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 1000, // limit each IP to 1000 requests per windowMs
+    windowMs: 15 * 60 * 1000,  // 15 min
+    max: 500,
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
+    message: { success: false, message: 'Too many requests, please try again later.' }
   });
   app.use(limiter);
-} else {
-  
 }
 
+// ── Body parsers (large limit only for face/upload routes) ───────────────────
+app.use('/api/face', express.json({ limit: '60mb' }));
+app.use('/api/face', express.urlencoded({ extended: true, limit: '60mb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  autoIndex: false
-})
-.then(() => {
-  console.log('✅ Connected to MongoDB');
-})
-.catch(err => {
-  console.error('❌ MongoDB Connection Error:', err.message);
-});
-
-// Handle preflight requests
-app.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin);
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-requested-with');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(200);
-});
-
-// Body parsing middleware - Increased limits for face data
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-
-// MongoDB connection
-mongoose.connection.once("open", async () => {
+// ── MongoDB connection ────────────────────────────────────────────────────────
+const connectDB = async () => {
   try {
-    const collection = mongoose.connection.db.collection("users");
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      autoIndex: true,          // enable indexes in production too
+      maxPoolSize: 10,          // connection pool
+      serverSelectionTimeoutMS: 10_000,
+      socketTimeoutMS: 60_000,
+    });
+    console.log('✅ MongoDB connected');
+  } catch (err) {
+    console.error('❌ MongoDB connection failed:', err.message);
+    process.exit(1);
+  }
+};
 
-    const indexes = await collection.indexes();
+connectDB();
 
-    for (let index of indexes) {
-      if (index.name.includes("nfcCards.cardId")) {
-        await collection.dropIndex(index.name);
+// Clean up any bad index on nfcCards.cardId (legacy issue)
+mongoose.connection.once('open', async () => {
+  try {
+    const col = mongoose.connection.db.collection('users');
+    const indexes = await col.indexes();
+    for (const idx of indexes) {
+      if (idx.name?.includes('nfcCards.cardId')) {
+        await col.dropIndex(idx.name);
+        console.log('🧹 Dropped legacy nfcCards.cardId index');
       }
     }
-
-    
-  } catch (err) {
-    
-  }
+  } catch (_) { /* non-fatal */ }
 });
-// Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/users', require('./routes/users'));
-app.use('/api/events', require('./routes/events'));
-app.use('/api/attendance', require('./routes/attendance'));
-app.use("/api/payments", paymentRoutes);
-app.use('/api/bookings', require('./routes/bookings'));
-app.use('/api/admin', require('./routes/admin'));
+
+// ── Routes ───────────────────────────────────────────────────────────────────
+app.use('/api/auth',             require('./routes/auth'));
+app.use('/api/users',            require('./routes/users'));
+app.use('/api/events',           require('./routes/events'));
+app.use('/api/attendance',       require('./routes/attendance'));
+app.use('/api/payments',         require('./routes/paymentRoutes'));
+app.use('/api/bookings',         require('./routes/bookings'));
+app.use('/api/admin',            require('./routes/admin'));
 app.use('/api/admin/subscription', require('./routes/adminSubscription'));
-app.use('/api/admin/reports', require('./routes/adminReports'));
-app.use('/api/analytics', require('./routes/analytics'));
-app.use('/api/chatbot', require('./routes/chatbot'));
+app.use('/api/admin/reports',    require('./routes/adminReports'));
+app.use('/api/analytics',        require('./routes/analytics'));
+app.use('/api/chatbot',          require('./routes/chatbot'));
 app.use('/api/chatbot/analytics', require('./routes/chatbotAnalytics'));
-app.use('/api/notifications', require('./routes/notifications'));
-app.use('/api/face', require('./routes/face'));
-app.use('/api/pure-face', require('./routes/pureNodeFace'));
-app.use('/api/email', require('./routes/emailVerification'));
-app.use('/api/upload', require('./routes/upload'));
-app.use('/api/certificates', require('./routes/certificates'));
-app.use('/api/contact', require('./routes/contact'));
+app.use('/api/notifications',    require('./routes/notifications'));
+app.use('/api/face',             require('./routes/face'));
+app.use('/api/pure-face',        require('./routes/pureNodeFace'));
+app.use('/api/email',            require('./routes/emailVerification'));
+app.use('/api/upload',           require('./routes/upload'));
+app.use('/api/certificates',     require('./routes/certificates'));
+app.use('/api/contact',          require('./routes/contact'));
 
-
-// Health check route for production monitoring
+// ── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'online', 
+  res.json({
+    status: 'online',
     timestamp: new Date().toISOString(),
     env: process.env.NODE_ENV,
     db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
 });
 
-// Root route - Welcome message
 app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Eventra API is running', 
-    version: '1.0.0',
-    documentation: '/api/health'
-  });
+  res.json({ message: 'Eventra API is running', version: '2.0.0' });
 });
 
+// ── Static files (only if client build exists) ───────────────────────────────
 if (process.env.NODE_ENV === 'production') {
-  // Only serve static files if the build folder exists
   const buildPath = path.join(__dirname, 'client/build');
   app.use(express.static(buildPath));
+  // SPA fallback — every non-API route serves index.html
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(buildPath, 'index.html'));
+    }
+  });
 }
 
-// Error handling middleware
+// ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
-  console.error('🔴 Server Error:', err);
-  res.status(500).json({ 
-    message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'production' ? err.message : err.stack
+  console.error('🔴 Unhandled error:', err.message);
+
+  // Multer errors
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({ success: false, message: 'File too large. Max 5MB per image.' });
+  }
+  if (err.code === 'LIMIT_FILE_COUNT') {
+    return res.status(400).json({ success: false, message: 'Too many files. Max 25 allowed.' });
+  }
+
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Internal server error',
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
   });
 });
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ message: 'Route not found' });
+// ── 404 handler ───────────────────────────────────────────────────────────────
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
 });
 
+// ── Start server ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-// Bind to 0.0.0.0 so Render can detect the open port
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
 });

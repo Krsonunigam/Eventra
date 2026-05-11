@@ -9,8 +9,23 @@ const { sendResetOTP } = require('../utils/emailService');
 const crypto = require('crypto');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
 const router = express.Router();
+
+// ─── Migration helper ───────────────────────────────────────────────────────
+// Safely derives face status from any user document regardless of schema version.
+// Old users may have faceImages as strings — we treat those as already migrated
+// if they have faceTrainingDate + sufficient sample count.
+const safeFaceStatus = (user) => {
+  const sampleCount = user.faceSampleCount || 0;
+  const hasDate = Boolean(user.faceTrainingDate);
+
+  // Accept as complete if: flags are true, OR has training date + 10+ samples
+  const faceDataCollected    = user.faceDataCollected    || (hasDate && sampleCount >= 10);
+  const faceTrainingCompleted = user.faceTrainingCompleted || (hasDate && sampleCount >= 10);
+  const isFaceVerified       = user.isFaceVerified       || faceTrainingCompleted;
+
+  return { faceDataCollected, faceTrainingCompleted, isFaceVerified };
+};
 
 // Register new user
 router.post('/register', async (req, res) => {
@@ -742,68 +757,101 @@ router.get('/face-status', auth, async (req, res) => {
   }
 });
 
-// Get current user info
+// GET /api/auth/me — Returns the authenticated user's full profile.
+// Migration-safe: works for both old (string faceImages) and new ({url,public_id}) users.
 router.get('/me', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select('-password');
+    const user = await User.findById(req.user.userId)
+      .select('-password -faceData -base64Images -resetPasswordOTP -resetPasswordExpires');
+
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const hasEnoughFaceSamples = (user.faceSampleCount || 0) >= 10;
-    const hasTrainingArtifacts = Boolean(user.faceTrainingDate) && hasEnoughFaceSamples;
-    const normalizedFaceDataCollected = user.faceDataCollected || hasTrainingArtifacts;
-    const normalizedFaceTrainingCompleted = user.faceTrainingCompleted || hasTrainingArtifacts;
+    // Derive face status safely (handles old + new schema)
+    const { faceDataCollected, faceTrainingCompleted, isFaceVerified } = safeFaceStatus(user);
 
+    // Only write back to DB if flags are stale (avoid unnecessary saves)
     if (
-      normalizedFaceDataCollected !== user.faceDataCollected ||
-      normalizedFaceTrainingCompleted !== user.faceTrainingCompleted
+      faceDataCollected    !== user.faceDataCollected ||
+      faceTrainingCompleted !== user.faceTrainingCompleted ||
+      isFaceVerified       !== user.isFaceVerified
     ) {
-      user.faceDataCollected = normalizedFaceDataCollected;
-      user.faceTrainingCompleted = normalizedFaceTrainingCompleted;
-      await user.save();
+      await User.findByIdAndUpdate(user._id, {
+        $set: { faceDataCollected, faceTrainingCompleted, isFaceVerified }
+      });
     }
 
-    res.json({
+    return res.json({
       success: true,
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isActive: user.isActive,
-        emailVerified: user.emailVerified,
-        profilePicture: user.profilePicture,
-        phone: user.phone,
-        phoneNumber: user.phoneNumber,
-        studentId: user.studentId,
-        institute: user.institute,
-        dateOfBirth: user.dateOfBirth,
-        gender: user.gender,
-        bio: user.bio,
-        socialLinks: user.socialLinks,
+        id:                      user._id,
+        name:                    user.name,
+        email:                   user.email,
+        role:                    user.role,
+        isActive:                user.isActive,
+        emailVerified:           user.emailVerified,
+        profilePicture:          user.profilePicture,
+        phone:                   user.phone,
+        phoneNumber:             user.phoneNumber,
+        studentId:               user.studentId,
+        institute:               user.institute,
+        dateOfBirth:             user.dateOfBirth,
+        gender:                  user.gender,
+        bio:                     user.bio,
+        socialLinks:             user.socialLinks,
         notificationPreferences: user.notificationPreferences,
-        privacySettings: user.privacySettings,
-        address: user.address,
-        preferences: user.preferences,
-        faceDataCollected: normalizedFaceDataCollected,
-        faceTrainingCompleted: normalizedFaceTrainingCompleted,
-        isFaceVerified: user.isFaceVerified || false,
-        faceSampleCount: user.faceSampleCount || 0,
-        faceTrainingDate: user.faceTrainingDate,
-        faceVerificationDate: user.faceVerificationDate,
-        faceVerificationConfidence: user.faceVerificationConfidence,
-        faceDataQuality: user.faceDataQuality,
+        privacySettings:         user.privacySettings,
+        address:                 user.address,
+        preferences:             user.preferences,
+        // ── Face fields (migration-safe) ────────────────────────────
+        faceDataCollected:          faceDataCollected,
+        faceTrainingCompleted:       faceTrainingCompleted,
+        isFaceVerified:             isFaceVerified,
+        faceSampleCount:            user.faceSampleCount || 0,
+        faceDataQuality:            user.faceDataQuality || 'medium',
+        faceTrainingDate:           user.faceTrainingDate,
+        faceVerificationDate:       user.faceVerificationDate,
+        faceVerificationConfidence: user.faceVerificationConfidence || 0,
+        // ─────────────────────────────────────────────────────────────
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       }
     });
   } catch (error) {
-    
-    res.status(500).json({ 
-      message: 'Failed to get user info', 
-      error: error.message 
-    });
+    console.error('GET /api/auth/me error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to get user info' });
+  }
+});
+
+// PUT /api/auth/change-password
+router.put('/change-password', auth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Both passwords are required' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
+    }
+
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (user.authProvider === 'google') {
+      return res.status(400).json({ success: false, message: 'Google accounts cannot change password here' });
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+    return res.json({ success: true, message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Change password error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to change password' });
   }
 });
 
