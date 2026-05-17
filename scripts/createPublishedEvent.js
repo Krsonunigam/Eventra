@@ -1,17 +1,8 @@
-const mongoose = require('mongoose');
 const Event = require('../models/Event');
 require('dotenv').config();
 
 const createPublishedEvent = async () => {
   try {
-    // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/eventra', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-
-    
-
     // Create a new published event
     const newEvent = new Event({
       title: 'Sample Published Event',
@@ -75,9 +66,6 @@ const createPublishedEvent = async () => {
     
 
   } catch (error) {
-    
-  } finally {
-    await mongoose.disconnect();
     
   }
 };

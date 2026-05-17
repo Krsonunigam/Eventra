@@ -1,17 +1,8 @@
-const mongoose = require('mongoose');
 const Event = require('../models/Event');
 require('dotenv').config();
 
 const publishAllDraftEvents = async () => {
   try {
-    // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/eventra', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-
-    
-
     // Find all draft events
     const draftEvents = await Event.find({ status: 'draft' });
     
@@ -37,9 +28,6 @@ const publishAllDraftEvents = async () => {
     });
 
   } catch (error) {
-    
-  } finally {
-    await mongoose.disconnect();
     
   }
 };

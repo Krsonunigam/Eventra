@@ -1,17 +1,8 @@
-const mongoose = require('mongoose');
 const User = require('../models/User');
 require('dotenv').config();
 
 const fixAllUsers = async () => {
   try {
-    // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/eventra', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-
-    
-
     // Find all users that don't have gender set or have empty gender
     const usersToFix = await User.find({
       $or: [
@@ -79,9 +70,6 @@ const fixAllUsers = async () => {
     });
 
   } catch (error) {
-    
-  } finally {
-    await mongoose.disconnect();
     
   }
 };

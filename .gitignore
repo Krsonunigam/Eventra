@@ -50,6 +50,8 @@ pip-wheel-metadata/
 .env.test
 .env.development
 # NOTE: .env.production is intentionally NOT ignored — it contains build flags, not secrets.
+firebase-service-account.json
+*service-account*.json
 secrets.*
 credentials.json
 *.pem
