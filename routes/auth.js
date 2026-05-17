@@ -7,7 +7,7 @@ const emailVerificationService = require('../utils/emailVerification');
 const { storeFaceData, verifyFace } = require('../utils/pureNodeFaceRecognition');
 const { sendResetOTP } = require('../utils/emailService');
 const crypto = require('crypto');
-const { getJwtSecret } = require('../utils/secrets');
+
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const router = express.Router();
@@ -78,7 +78,7 @@ router.post('/register', async (req, res) => {
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id, email: user.email },
-      getJwtSecret(),
+      process.env.JWT_SECRET || 'eventra-development-jwt-secret',
       { expiresIn: '7d' }
     );
 
@@ -127,7 +127,7 @@ router.post('/login', async (req, res) => {
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id, email: user.email },
-      getJwtSecret(),
+      process.env.JWT_SECRET || 'eventra-development-jwt-secret',
       { expiresIn: '7d' }
     );
 
@@ -196,7 +196,7 @@ router.post('/google', async (req, res) => {
     // Generate JWT token
     const jwtToken = jwt.sign(
       { userId: user._id, email: user.email },
-      getJwtSecret(),
+      process.env.JWT_SECRET || 'eventra-development-jwt-secret',
       { expiresIn: '7d' }
     );
 
