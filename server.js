@@ -34,7 +34,7 @@ const allowedOrigins = [
   'http://127.0.0.1:3000',
   'http://localhost:5000',
   'http://127.0.0.1:5000',
-  ...(process.env.NODE_ENV !== 'production' ? ['https://eventraind.onrender.com'] : [])
+  ...(process.env.NODE_ENV !== 'production' ? ['https://eventrafrontend.vercel.app'] : [])
 ].map(o => o?.replace(/\/$/, '')).filter(Boolean);
 
 app.use(cors({
