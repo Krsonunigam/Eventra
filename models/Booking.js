@@ -125,11 +125,10 @@ bookingSchema.methods.getSummary = function() {
 };
 
 // Pre-save middleware to generate verification code
-bookingSchema.pre('save', function(next) {
+bookingSchema.pre('save', function() {
   if (this.isNew && !this.verificationCode) {
     this.verificationCode = generateVerificationCode();
   }
-  next();
 });
 
 // Helper function to generate verification code

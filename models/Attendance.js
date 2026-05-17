@@ -76,9 +76,6 @@ attendanceSchema.virtual('date').get(function() {
 // Ensure virtual fields are serialized
 attendanceSchema.set('toJSON', { virtuals: true });
 
-// Pre-save middleware (no-op for virtual date - handled by virtual getter)
-attendanceSchema.pre('save', function(next) {
-  next();
-});
+
 
 module.exports = mongoose.model('Attendance', attendanceSchema);

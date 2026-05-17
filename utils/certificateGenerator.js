@@ -256,7 +256,7 @@ class CertificateGenerator {
       });
 
       // --- 8. QR Code & ID (Center Bottom) ---
-      const verifyUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/verify-certificate/${certificate.verificationCode}`;
+      const verifyUrl = `${process.env.CLIENT_URL || 'https://eventraind.onrender.com'}/verify-certificate/${certificate.verificationCode}`;
       const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, scale: 4 });
       const qrImage = await pdfDoc.embedPng(qrDataUrl);
       

@@ -15,7 +15,7 @@ class EmailVerificationService {
 
   // Send verification email
   async sendVerificationEmail(email, token) {
-    const verificationUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/verify-email?token=${token}`;
+    const verificationUrl = `${process.env.CLIENT_URL || 'https://eventraind.onrender.com'}/verify-email?token=${token}`;
     
     const mailOptions = {
       from: `"Eventra" <${process.env.EMAIL_USER || 'noreply@eventra.com'}>`,

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
 import useCustomToast from '../../utils/customToast';
+import { API_BASE_URL } from '../../config/api';
 
 const EmailVerification = () => {
   const toast = useCustomToast();
@@ -22,7 +23,7 @@ const EmailVerification = () => {
 
   const verifyEmail = useCallback(async (verificationToken) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/email/verify?token=${verificationToken}`, {
+      const response = await fetch(`${API_BASE_URL}/api/email/verify?token=${verificationToken}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +60,7 @@ const EmailVerification = () => {
       const email = prompt('Enter your email address to resend verification:');
       if (!email) return;
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/email/send-verification`, {
+      const response = await fetch(`${API_BASE_URL}/api/email/send-verification`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

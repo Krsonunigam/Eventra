@@ -158,7 +158,7 @@ certificateSchema.statics.generateVerificationCode = function() {
 };
 
 // Pre-validate middleware to generate IDs before validation
-certificateSchema.pre('validate', function(next) {
+certificateSchema.pre('validate', function() {
   if (this.isNew) {
     if (!this.certificateId) {
       this.certificateId = this.constructor.generateCertificateId();
@@ -170,7 +170,6 @@ certificateSchema.pre('validate', function(next) {
       this.verificationCode = this.constructor.generateVerificationCode();
     }
   }
-  next();
 });
 
 // Ensure virtual fields are serialized

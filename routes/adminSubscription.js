@@ -1,5 +1,4 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const AdminSubscription = require('../models/AdminSubscription');
 const User = require('../models/User');
 const { auth } = require('../middleware/auth');

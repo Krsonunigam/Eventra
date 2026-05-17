@@ -1,10 +1,10 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const User = require('../models/User');
 const Event = require('../models/Event');
 const Booking = require('../models/Booking');
 const Attendance = require('../models/Attendance');
 const Certificate = require('../models/Certificate');
+const Contact = require('../models/Contact');
 const { adminAuth } = require('../middleware/auth');
 const { checkSubscription } = require('../middleware/subscription');
 const { generateUserReport, generateEventReport } = require('../utils/excelService');
@@ -543,10 +543,10 @@ router.put('/events/:id', adminAuth, async (req, res) => {
         } else if (key === 'organizer') {
           // Handle organizer field - must be a valid ObjectId
           let targetId = null;
-          if (typeof req.body[key] === 'string' && mongoose.Types.ObjectId.isValid(req.body[key])) {
-            targetId = new mongoose.Types.ObjectId(req.body[key]);
-          } else if (req.body[key] && req.body[key]._id && mongoose.Types.ObjectId.isValid(req.body[key]._id)) {
-            targetId = new mongoose.Types.ObjectId(req.body[key]._id);
+          if (typeof req.body[key] === 'string' && req.body[key].trim()) {
+            targetId = req.body[key].trim();
+          } else if (req.body[key] && req.body[key]._id) {
+            targetId = String(req.body[key]._id);
           }
 
           if (targetId) {
@@ -822,7 +822,6 @@ router.post('/notifications/send', adminAuth, async (req, res) => {
 });
 
 const JSZip = require('jszip');
-const Contact = require('../models/Contact');
 
 // Get all contact messages
 router.get('/contacts', adminAuth, async (req, res) => {
@@ -945,6 +944,66 @@ router.get('/events/:id/bulk-certificates', adminAuth, async (req, res) => {
   } catch (error) {
     console.error('Bulk certificate generation error:', error);
     res.status(500).json({ message: 'Failed to generate bulk certificates', error: error.message });
+  }
+});
+
+// Approve a booking (Admin manual bypass approval)
+router.put('/bookings/:id/approve', adminAuth, async (req, res) => {
+  try {
+    const Payment = require('../models/Payment');
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    if (booking.status === 'confirmed') {
+      return res.status(400).json({ success: false, message: 'Booking is already confirmed' });
+    }
+
+    // Update booking status
+    booking.status = 'confirmed';
+    booking.paymentDate = new Date();
+    if (!booking.razorpayPaymentId) {
+      booking.razorpayPaymentId = `admin_approved_${Date.now()}`;
+    }
+    await booking.save();
+
+    // Create a Payment record as well so the payment dashboard shows it!
+    await Payment.create({
+      user: booking.user,
+      event: booking.event,
+      booking: booking._id,
+      amount: booking.totalAmount,
+      status: 'success',
+      provider: 'admin_manual',
+      razorpayOrderId: booking.razorpayOrderId,
+      razorpayPaymentId: booking.razorpayPaymentId,
+      paidAt: new Date()
+    });
+
+    // Update event available seats
+    await Event.findByIdAndUpdate(booking.event, {
+      $inc: { availableSeats: -booking.quantity }
+    });
+
+    // Send confirmation email
+    try {
+      const fullBooking = await Booking.findById(booking._id).populate('event').populate('user');
+      const PDFGenerator = require('../utils/pdfGenerator');
+      const pdfGenerator = new PDFGenerator();
+      const pdfBuffer = await pdfGenerator.generateEventPass(fullBooking, fullBooking.event, fullBooking.user);
+      await sendBookingConfirmation(fullBooking.user.email, fullBooking.user.name, fullBooking.event, fullBooking, pdfBuffer);
+    } catch (emailError) {
+      console.error('Approval email error:', emailError.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Booking manually approved successfully',
+      booking
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to approve booking', error: error.message });
   }
 });
 

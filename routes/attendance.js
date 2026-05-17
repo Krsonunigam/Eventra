@@ -1,5 +1,4 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const multer = require('multer');
 const PDFDocument = require('pdfkit');
 const path = require('path');
@@ -29,9 +28,16 @@ const getAttendanceWindow = (event) => {
   };
 };
 
-const validateAttendanceWindow = (event) => {
+const validateAttendanceWindow = (event, req = null) => {
   const now = new Date();
   const window = getAttendanceWindow(event);
+
+  // Bypass attendance window check if running locally in development OR if the user is an admin
+  const isAdmin = req && req.user && req.user.role === 'admin';
+  const isLocal = process.env.NODE_ENV !== 'production';
+  if (isLocal || isAdmin) {
+    return { ok: true, now, ...window };
+  }
 
   if (now < window.opensAt) {
     return {
@@ -150,18 +156,21 @@ router.post('/mark', adminAuth, async (req, res) => {
     const eventStart = new Date(event.dateTime.start);
     const attendanceWindow = new Date(eventStart.getTime() - 15 * 60 * 1000); // 15 minutes before
 
-    if (now < attendanceWindow) {
-      return res.status(400).json({ 
-        message: 'Attendance window not open yet',
-        opensAt: attendanceWindow.toISOString()
-      });
-    }
+    const isBypassed = (process.env.NODE_ENV !== 'production') || (req.user && req.user.role === 'admin');
+    if (!isBypassed) {
+      if (now < attendanceWindow) {
+        return res.status(400).json({ 
+          message: 'Attendance window not open yet',
+          opensAt: attendanceWindow.toISOString()
+        });
+      }
 
-    if (now > eventStart) {
-      return res.status(400).json({ 
-        message: 'Attendance window has closed',
-        closedAt: eventStart.toISOString()
-      });
+      if (now > eventStart) {
+        return res.status(400).json({ 
+          message: 'Attendance window has closed',
+          closedAt: eventStart.toISOString()
+        });
+      }
     }
 
     // Check if user has already marked attendance
@@ -313,7 +322,7 @@ router.post('/face-recognition', adminAuth, async (req, res) => {
       });
     }
 
-    const attendanceWindow = validateAttendanceWindow(event);
+    const attendanceWindow = validateAttendanceWindow(event, req);
     if (!attendanceWindow.ok) {
       return res.status(attendanceWindow.status).json(attendanceWindow.body);
     }
@@ -488,20 +497,23 @@ router.post('/rfid-scan', adminAuth, async (req, res) => {
     const attendanceWindowStart = new Date(eventStart.getTime() - 15 * 60 * 1000); // 15 minutes before
     const attendanceWindowEnd = new Date(eventEnd.getTime() + 2 * 60 * 60 * 1000); // 2 hours after end
 
-    if (now < attendanceWindowStart) {
-      return res.status(400).json({ 
-        message: 'Attendance window is not open yet',
-        opensAt: attendanceWindowStart.toISOString(),
-        success: false
-      });
-    }
+    const isBypassed = (process.env.NODE_ENV !== 'production') || (req.user && req.user.role === 'admin');
+    if (!isBypassed) {
+      if (now < attendanceWindowStart) {
+        return res.status(400).json({ 
+          message: 'Attendance window is not open yet',
+          opensAt: attendanceWindowStart.toISOString(),
+          success: false
+        });
+      }
 
-    if (now > attendanceWindowEnd) {
-      return res.status(400).json({ 
-        message: 'Attendance window has closed',
-        closedAt: attendanceWindowEnd.toISOString(),
-        success: false
-      });
+      if (now > attendanceWindowEnd) {
+        return res.status(400).json({ 
+          message: 'Attendance window has closed',
+          closedAt: attendanceWindowEnd.toISOString(),
+          success: false
+        });
+      }
     }
 
     // Check if already marked attendance
@@ -649,20 +661,23 @@ router.post('/booking-verify', adminAuth, async (req, res) => {
     const attendanceWindowStart = new Date(eventStart.getTime() - 15 * 60 * 1000); // 15 minutes before
     const attendanceWindowEnd = new Date(eventEnd.getTime() + 2 * 60 * 60 * 1000); // 2 hours after end
 
-    if (now < attendanceWindowStart) {
-      return res.status(400).json({ 
-        message: 'Attendance window is not open yet',
-        opensAt: attendanceWindowStart.toISOString(),
-        success: false
-      });
-    }
+    const isBypassed = (process.env.NODE_ENV !== 'production') || (req.user && req.user.role === 'admin');
+    if (!isBypassed) {
+      if (now < attendanceWindowStart) {
+        return res.status(400).json({ 
+          message: 'Attendance window is not open yet',
+          opensAt: attendanceWindowStart.toISOString(),
+          success: false
+        });
+      }
 
-    if (now > attendanceWindowEnd) {
-      return res.status(400).json({ 
-        message: 'Attendance window has closed',
-        closedAt: attendanceWindowEnd.toISOString(),
-        success: false
-      });
+      if (now > attendanceWindowEnd) {
+        return res.status(400).json({ 
+          message: 'Attendance window has closed',
+          closedAt: attendanceWindowEnd.toISOString(),
+          success: false
+        });
+      }
     }
 
     // Check if already marked attendance
@@ -895,7 +910,7 @@ router.post('/qr-scan', adminAuth, async (req, res) => {
       });
     }
 
-    const attendanceWindow = validateAttendanceWindow(event);
+    const attendanceWindow = validateAttendanceWindow(event, req);
     if (!attendanceWindow.ok) {
       return res.status(attendanceWindow.status).json(attendanceWindow.body);
     }
@@ -1281,20 +1296,23 @@ router.post('/image-recognition', auth, upload.single('image'), async (req, res)
     const attendanceWindowStart = new Date(eventStart.getTime() - 15 * 60 * 1000); // 15 minutes before
     const attendanceWindowEnd = new Date(eventEnd.getTime() + 2 * 60 * 60 * 1000); // 2 hours after end
 
-    if (now < attendanceWindowStart) {
-      return res.status(400).json({ 
-        message: 'Attendance window is not open yet',
-        opensAt: attendanceWindowStart.toISOString(),
-        success: false
-      });
-    }
+    const isBypassed = (process.env.NODE_ENV !== 'production') || (req.user && req.user.role === 'admin');
+    if (!isBypassed) {
+      if (now < attendanceWindowStart) {
+        return res.status(400).json({ 
+          message: 'Attendance window is not open yet',
+          opensAt: attendanceWindowStart.toISOString(),
+          success: false
+        });
+      }
 
-    if (now > attendanceWindowEnd) {
-      return res.status(400).json({ 
-        message: 'Attendance window has closed',
-        closedAt: attendanceWindowEnd.toISOString(),
-        success: false
-      });
+      if (now > attendanceWindowEnd) {
+        return res.status(400).json({ 
+          message: 'Attendance window has closed',
+          closedAt: attendanceWindowEnd.toISOString(),
+          success: false
+        });
+      }
     }
 
     // Check if already marked attendance
@@ -1448,20 +1466,23 @@ router.post('/qr-upload', auth, upload.single('qrImage'), async (req, res) => {
     const attendanceWindowStart = new Date(eventStart.getTime() - 15 * 60 * 1000); // 15 minutes before
     const attendanceWindowEnd = new Date(eventEnd.getTime() + 2 * 60 * 60 * 1000); // 2 hours after end
 
-    if (now < attendanceWindowStart) {
-      return res.status(400).json({ 
-        message: 'Attendance window is not open yet',
-        opensAt: attendanceWindowStart.toISOString(),
-        success: false
-      });
-    }
+    const isBypassed = (process.env.NODE_ENV !== 'production') || (req.user && req.user.role === 'admin');
+    if (!isBypassed) {
+      if (now < attendanceWindowStart) {
+        return res.status(400).json({ 
+          message: 'Attendance window is not open yet',
+          opensAt: attendanceWindowStart.toISOString(),
+          success: false
+        });
+      }
 
-    if (now > attendanceWindowEnd) {
-      return res.status(400).json({ 
-        message: 'Attendance window has closed',
-        closedAt: attendanceWindowEnd.toISOString(),
-        success: false
-      });
+      if (now > attendanceWindowEnd) {
+        return res.status(400).json({ 
+          message: 'Attendance window has closed',
+          closedAt: attendanceWindowEnd.toISOString(),
+          success: false
+        });
+      }
     }
 
     // Check if already marked attendance
@@ -1605,7 +1626,7 @@ router.post('/face-check-in', adminAuth, async (req, res) => {
         const validBookings = allBookings
           .filter(b => {
             if (!b.event) return false;
-            const window = validateAttendanceWindow(b.event);
+            const window = validateAttendanceWindow(b.event, req);
             return window.ok;
           })
           .sort((a, b) => new Date(a.event.dateTime.start) - new Date(b.event.dateTime.start));

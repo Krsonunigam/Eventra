@@ -1,11 +1,12 @@
 require('dotenv').config();
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const mongoose = require('mongoose');
+const sanitizeRequest = require('./middleware/sanitize');
 
 // Set timezone to IST
 process.env.TZ = 'Asia/Kolkata';
@@ -25,10 +26,15 @@ app.use((req, res, next) => {
 // ── CORS ─────────────────────────────────────────────────────────────────────
 // ── CORS ─────────────────────────────────────────────────────────────────────
 const allowedOrigins = [
-  'http://127.0.0.1:3000',
+  'https://eventrafrontend.vercel.app',
+  'https://eventraindiaai.web.app',
+  'https://eventraind.onrender.com',
+  process.env.CLIENT_URL,
   'http://localhost:3000',
-  'https://eventra-jet.vercel.app',
-  process.env.CLIENT_URL
+  'http://127.0.0.1:3000',
+  'http://localhost:5000',
+  'http://127.0.0.1:5000',
+  ...(process.env.NODE_ENV !== 'production' ? ['https://eventraind.onrender.com'] : [])
 ].map(o => o?.replace(/\/$/, '')).filter(Boolean);
 
 app.use(cors({
@@ -94,13 +100,12 @@ app.use('/api/face', express.json({ limit: '60mb' }));
 app.use('/api/face', express.urlencoded({ extended: true, limit: '60mb' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(sanitizeRequest);
 
 // ── MongoDB connection ────────────────────────────────────────────────────────
 const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       autoIndex: true,          // enable indexes in production too
       maxPoolSize: 10,          // connection pool
       serverSelectionTimeoutMS: 10_000,

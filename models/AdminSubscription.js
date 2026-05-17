@@ -174,7 +174,7 @@ adminSubscriptionSchema.statics.getExpiringSubscriptions = function(days = 7) {
 };
 
 // Pre-save middleware to set end date if not provided
-adminSubscriptionSchema.pre('save', function(next) {
+adminSubscriptionSchema.pre('save', function() {
   if (this.isNew && !this.endDate) {
     const start = this.startDate || new Date();
     // All subscription types are monthly (1 month duration)
@@ -182,7 +182,6 @@ adminSubscriptionSchema.pre('save', function(next) {
     this.endDate = new Date(start.getTime() + (months * 30 * 24 * 60 * 60 * 1000));
     this.nextBillingDate = this.endDate;
   }
-  next();
 });
 
 // Ensure virtual fields are serialized

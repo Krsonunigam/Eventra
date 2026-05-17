@@ -2,6 +2,9 @@
   "name": "eventra-client",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20 <25"
+  },
   "dependencies": {
     "@react-oauth/google": "^0.13.5",
     "axios": "^1.5.0",
@@ -21,15 +24,13 @@
     "react-loading-skeleton": "^3.1.1",
     "react-modal": "^3.16.1",
     "react-query": "^3.39.3",
-    "react-quill": "^2.0.0",
     "react-router-dom": "^6.15.0",
-    "react-scripts": "5.0.1",
     "recharts": "^3.2.1",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "set HOST=127.0.0.1&& set DANGEROUSLY_DISABLE_HOST_CHECK=true&& react-scripts start",
-    "build": "CI=false GENERATE_SOURCEMAP=false react-scripts build",
+    "start": "set HOST=127.0.0.1&& set NODE_OPTIONS=--no-deprecation&& react-scripts start",
+    "build": "set NODE_OPTIONS=--no-deprecation&& set GENERATE_SOURCEMAP=false&& react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -55,10 +56,18 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://127.0.0.1:5000",
   "devDependencies": {
     "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6",
+    "postcss": "^8.5.14",
+    "react-scripts": "5.0.1",
     "tailwindcss": "^3.4.14"
+  },
+  "overrides": {
+    "@tootallnate/once": "^3.0.1",
+    "node-fetch": "^2.7.0",
+    "nth-check": "^3.0.1",
+    "postcss": "^8.5.14",
+    "serialize-javascript": "^7.0.5",
+    "underscore": "^1.13.8"
   }
 }

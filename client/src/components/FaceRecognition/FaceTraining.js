@@ -58,11 +58,10 @@ const FaceTraining = ({ isOpen, onComplete, onClose }) => {
     }
   };
 
+  const isCapturingRef = useRef(false);
+
   const clearCapture = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+    isCapturingRef.current = false;
     setIsCapturing(false);
   };
 
@@ -83,7 +82,8 @@ const FaceTraining = ({ isOpen, onComplete, onClose }) => {
   };
 
   // ── Auto-capture 25 samples at intervals ─────────────────────────────────
-  const startAutoCapture = () => {
+  const startAutoCapture = async () => {
+    isCapturingRef.current = true;
     setIsCapturing(true);
     setSamples([]);
     setCurrentSample(0);
@@ -92,23 +92,64 @@ const FaceTraining = ({ isOpen, onComplete, onClose }) => {
     let count = 0;
     const capturedBlobs = [];
 
-    intervalRef.current = setInterval(async () => {
-      if (count >= REQUIRED_SAMPLES) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-        setIsCapturing(false);
-        toast.success('✅ 25 samples collected! Ready to upload.');
-        return;
-      }
+    // Helper to read blob as Base64 asynchronously
+    const blobToBase64 = (blob) => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onloadend = () => resolve(reader.result);
+      });
+    };
+
+    while (isCapturingRef.current && count < REQUIRED_SAMPLES) {
+      // Wait for the interval
+      await new Promise(r => setTimeout(r, CAPTURE_INTERVAL_MS));
+      
+      // Double check capture flag
+      if (!isCapturingRef.current) break;
 
       const blob = await captureImage();
-      if (!blob || blob.size < 3000) return; // skip blank/tiny frames
+      if (!blob || blob.size < 3000) continue; // skip blank/tiny frames
 
-      capturedBlobs.push(blob);
-      setSamples(prev => [...prev, blob]);
-      count++;
-      setCurrentSample(count);
-    }, CAPTURE_INTERVAL_MS);
+      try {
+        const base64data = await blobToBase64(blob);
+        
+        // Detect face on the fly!
+        const response = await axios.post(`${API_BASE_URL}/api/pure-face/detect`, {
+          faceData: base64data
+        }, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+
+        if (!response.data.success || !response.data.hasFace) {
+          // Stop capturing immediately!
+          isCapturingRef.current = false;
+          setIsCapturing(false);
+          setSamples([]);
+          setCurrentSample(0);
+          toast.error("⚠️ Face not detected in the frame! Capturing stopped. Please stay in front of the camera.");
+          break;
+        }
+
+        capturedBlobs.push(blob);
+        setSamples(prev => [...prev, blob]);
+        count++;
+        setCurrentSample(count);
+      } catch (err) {
+        console.error("Face detection error:", err);
+        // Fallback: if network fails or temporary backend issue, just continue to keep user flow functional
+        capturedBlobs.push(blob);
+        setSamples(prev => [...prev, blob]);
+        count++;
+        setCurrentSample(count);
+      }
+    }
+
+    if (count >= REQUIRED_SAMPLES) {
+      isCapturingRef.current = false;
+      setIsCapturing(false);
+      toast.success('✅ 25 samples collected! Ready to upload.');
+    }
   };
 
   // ── Upload samples to backend ─────────────────────────────────────────────

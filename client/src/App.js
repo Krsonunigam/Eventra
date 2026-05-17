@@ -1,62 +1,64 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './contexts/ToastContext';
 import Layout from './components/Layout/Layout';
-import Home from './pages/Home/Home';
-import Events from './pages/Events/Events';
-import EventDetail from './pages/EventDetail/EventDetail';
-import Login from './pages/Auth/Login';
-import Register from './pages/Auth/Register';
-import ForgotPassword from './pages/Auth/ForgotPassword';
-import FaceVerify from './pages/Auth/FaceVerify';
-import EmailVerification from './components/Auth/EmailVerification';
-import Dashboard from './pages/Dashboard/Dashboard';
-import Profile from './pages/Profile/Profile';
-import ProfileEdit from './pages/Profile/ProfileEdit';
-import Bookings from './pages/Bookings/Bookings';
-import MyAttendance from './pages/Attendance/MyAttendance';
-import AllAttendance from './pages/Admin/AllAttendance';
-
-import AdminDashboard from './pages/Admin/AdminDashboard';
-import AdminEvents from './pages/Admin/AdminEvents';
-import AdminUsers from './pages/Admin/AdminUsers';
-import AdminReports from './pages/Admin/AdminReports';
-import AdminAnalytics from './pages/Admin/AdminAnalytics';
-import EventCreate from './pages/Admin/EventCreate';
-import EventEdit from './pages/Admin/EventEdit';
-import AdminMessages from './pages/Admin/AdminMessages';
-import AdminSubscription from './components/Admin/AdminSubscription';
-import SubscriptionManager from './components/Subscription/SubscriptionManager';
-import Settings from './pages/Settings/Settings';
-import Payment from './pages/Payment/Payment';
-// import UserProfileForm from './components/Forms/UserProfileForm';
 import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute';
 import AdminRoute from './components/AdminRoute/AdminRoute';
-import NotFound from './pages/NotFound/NotFound';
-
-// New pages
-import Blog from './pages/Blog/Blog';
-import HelpCenter from './pages/HelpCenter/HelpCenter';
-import PrivacyPolicy from './pages/PrivacyPolicy/PrivacyPolicy';
-import TermsOfService from './pages/TermsOfService/TermsOfService';
-import FAQ from './pages/FAQ/FAQ';
-import EventManagement from './pages/EventManagement/EventManagement';
-import FaceRecognition from './pages/FaceRecognition/FaceRecognition';
-import PaymentProcessing from './pages/PaymentProcessing/PaymentProcessing';
-import Analytics from './pages/Analytics/Analytics';
-import About from './pages/About/About';
-import Contact from './pages/Contact/Contact';
-import Careers from './pages/Careers/Careers';
-import Certification from './pages/Certification/Certification';
-import MyCertificates from './pages/Certification/MyCertificates';
-import CertificateVerify from './pages/Certification/CertificateVerify';
-import AdminCertificates from './pages/Admin/AdminCertificates';
-
 import ScrollToTop from './components/ScrollToTop';
-import FaceTest from './pages/FaceTest/FaceTest';
+
+const Home = lazy(() => import('./pages/Home/Home'));
+const Events = lazy(() => import('./pages/Events/Events'));
+const EventDetail = lazy(() => import('./pages/EventDetail/EventDetail'));
+const Login = lazy(() => import('./pages/Auth/Login'));
+const Register = lazy(() => import('./pages/Auth/Register'));
+const ForgotPassword = lazy(() => import('./pages/Auth/ForgotPassword'));
+const FaceVerify = lazy(() => import('./pages/Auth/FaceVerify'));
+const EmailVerification = lazy(() => import('./components/Auth/EmailVerification'));
+const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'));
+const Profile = lazy(() => import('./pages/Profile/Profile'));
+const ProfileEdit = lazy(() => import('./pages/Profile/ProfileEdit'));
+const Bookings = lazy(() => import('./pages/Bookings/Bookings'));
+const MyAttendance = lazy(() => import('./pages/Attendance/MyAttendance'));
+const AllAttendance = lazy(() => import('./pages/Admin/AllAttendance'));
+const AdminDashboard = lazy(() => import('./pages/Admin/AdminDashboard'));
+const AdminEvents = lazy(() => import('./pages/Admin/AdminEvents'));
+const AdminUsers = lazy(() => import('./pages/Admin/AdminUsers'));
+const AdminReports = lazy(() => import('./pages/Admin/AdminReports'));
+const AdminAnalytics = lazy(() => import('./pages/Admin/AdminAnalytics'));
+const EventCreate = lazy(() => import('./pages/Admin/EventCreate'));
+const EventEdit = lazy(() => import('./pages/Admin/EventEdit'));
+const AdminMessages = lazy(() => import('./pages/Admin/AdminMessages'));
+const AdminSubscription = lazy(() => import('./components/Admin/AdminSubscription'));
+const SubscriptionManager = lazy(() => import('./components/Subscription/SubscriptionManager'));
+const Settings = lazy(() => import('./pages/Settings/Settings'));
+const Payment = lazy(() => import('./pages/Payment/Payment'));
+const NotFound = lazy(() => import('./pages/NotFound/NotFound'));
+const Blog = lazy(() => import('./pages/Blog/Blog'));
+const HelpCenter = lazy(() => import('./pages/HelpCenter/HelpCenter'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService/TermsOfService'));
+const FAQ = lazy(() => import('./pages/FAQ/FAQ'));
+const EventManagement = lazy(() => import('./pages/EventManagement/EventManagement'));
+const FaceRecognition = lazy(() => import('./pages/FaceRecognition/FaceRecognition'));
+const PaymentProcessing = lazy(() => import('./pages/PaymentProcessing/PaymentProcessing'));
+const Analytics = lazy(() => import('./pages/Analytics/Analytics'));
+const About = lazy(() => import('./pages/About/About'));
+const Contact = lazy(() => import('./pages/Contact/Contact'));
+const Careers = lazy(() => import('./pages/Careers/Careers'));
+const Certification = lazy(() => import('./pages/Certification/Certification'));
+const MyCertificates = lazy(() => import('./pages/Certification/MyCertificates'));
+const CertificateVerify = lazy(() => import('./pages/Certification/CertificateVerify'));
+const AdminCertificates = lazy(() => import('./pages/Admin/AdminCertificates'));
+const FaceTest = lazy(() => import('./pages/FaceTest/FaceTest'));
+
+const PageLoader = () => (
+  <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
+    <div className="h-10 w-10 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
+  </div>
+);
 
 function App() {
   return (
@@ -66,7 +68,8 @@ function App() {
         <ToastProvider>
           <div className="min-h-screen bg-gray-900">
             <ScrollToTop />
-            <Routes>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
             <Route path="/" element={<Layout />}>
               <Route index element={<Home />} />
               <Route path="events" element={<Events />} />
@@ -216,7 +219,8 @@ function App() {
               
               <Route path="*" element={<NotFound />} />
             </Route>
-          </Routes>
+              </Routes>
+            </Suspense>
           </div>
         </ToastProvider>
         </AuthProvider>

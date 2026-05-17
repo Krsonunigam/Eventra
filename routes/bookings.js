@@ -2,6 +2,7 @@ const express = require('express');
 const Booking = require('../models/Booking');
 const Event = require('../models/Event');
 const User = require('../models/User');
+const Payment = require('../models/Payment');
 const { auth } = require('../middleware/auth');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
@@ -10,11 +11,20 @@ const { sendBookingConfirmation } = require('../utils/emailService');
 
 const router = express.Router();
 
-// Initialize Razorpay
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_RLZEezKE8Hb6gt',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || '9fwzs7VqV2UIRdYcAvQ9jvWV'
-});
+let razorpay;
+
+const getRazorpay = () => {
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    throw new Error('Razorpay credentials are not configured');
+  }
+  if (!razorpay) {
+    razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET
+    });
+  }
+  return razorpay;
+};
 
 // Create booking
 router.post('/', auth, async (req, res) => {
@@ -49,7 +59,7 @@ router.post('/', auth, async (req, res) => {
     const existingBooking = await Booking.findOne({
       user: userId,
       event: eventId,
-      status: { $in: ['confirmed', 'pending'] }
+      status: 'confirmed'
     });
 
     
@@ -122,7 +132,7 @@ router.post('/', auth, async (req, res) => {
       
       let razorpayOrder;
       try {
-        razorpayOrder = await razorpay.orders.create(orderOptions);
+        razorpayOrder = await getRazorpay().orders.create(orderOptions);
         
       } catch (rzpError) {
         
@@ -165,7 +175,7 @@ router.post('/verify-payment', auth, async (req, res) => {
     // Verify payment signature
     const body = razorpay_order_id + '|' + razorpay_payment_id;
     const expectedSignature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '9fwzs7VqV2UIRdYcAvQ9jvWV')
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
       .update(body.toString())
       .digest('hex');
 
@@ -181,8 +191,21 @@ router.post('/verify-payment', auth, async (req, res) => {
 
     booking.status = 'confirmed';
     booking.razorpayPaymentId = razorpay_payment_id;
+    booking.razorpayOrderId = razorpay_order_id;
     booking.paymentDate = new Date();
     await booking.save();
+
+    await Payment.create({
+      user: booking.user,
+      event: booking.event,
+      booking: booking._id,
+      amount: booking.totalAmount,
+      status: 'success',
+      provider: 'razorpay',
+      razorpayOrderId: razorpay_order_id,
+      razorpayPaymentId: razorpay_payment_id,
+      paidAt: new Date()
+    });
 
     // Update event available seats
     await Event.findByIdAndUpdate(booking.event, {

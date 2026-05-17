@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const AdminSubscription = require('../models/AdminSubscription');
+const { getJwtSecret } = require('../utils/secrets');
 
 // ─── auth middleware ─────────────────────────────────────────────────────────
 // Uses .lean() for a faster, plain-object query — saves ~30% DB read time.
@@ -14,7 +15,7 @@ const auth = async (req, res, next) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      decoded = jwt.verify(token, getJwtSecret());
     } catch (jwtErr) {
       // Distinguish expired vs invalid
       if (jwtErr.name === 'TokenExpiredError') {
@@ -57,7 +58,7 @@ const adminAuth = async (req, res, next) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      decoded = jwt.verify(token, getJwtSecret());
     } catch {
       return res.status(401).json({ message: 'Invalid token' });
     }
@@ -85,7 +86,7 @@ const premiumAdminAuth = async (req, res, next) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      decoded = jwt.verify(token, getJwtSecret());
     } catch {
       return res.status(401).json({ message: 'Invalid token' });
     }

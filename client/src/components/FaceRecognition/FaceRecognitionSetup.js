@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Camera, CheckCircle, AlertCircle, X, Shield, Eye, Zap } from 'lucide-react';
-import useCustomToast from '../../utils/customToast';
 import api from '../../utils/axiosConfig';
+import useCustomToast from '../../utils/customToast';
 
 const FaceRecognitionSetup = ({ onClose, onSuccess, user }) => {
+  const toast = useCustomToast();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -45,7 +46,6 @@ const FaceRecognitionSetup = ({ onClose, onSuccess, user }) => {
   };
 
   const stopCamera = () => {
-  const toast = useCustomToast();
     if (videoRef.current && videoRef.current.srcObject) {
       const tracks = videoRef.current.srcObject.getTracks();
       tracks.forEach(track => track.stop());
@@ -74,20 +74,11 @@ const FaceRecognitionSetup = ({ onClose, onSuccess, user }) => {
     setFaceDetected(true);
 
     try {
-      // Send face data for processing
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/face/collect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          faceSamples: [...capturedSamples, imageData]
-        })
+      const response = await api.post('/api/face/collect', {
+        faceSamples: [...capturedSamples, imageData]
       });
 
-      if (response.ok) {
-        const result = await response.json();
+      if (response.data) {
         const newSamples = [...capturedSamples, imageData];
         setCapturedSamples(newSamples);
         
@@ -109,13 +100,9 @@ const FaceRecognitionSetup = ({ onClose, onSuccess, user }) => {
           setCurrentStep(2);
           toast.success(`Face sample ${newSamples.length}/${requiredSamples} captured successfully!`);
         }
-      } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to process face sample');
       }
     } catch (error) {
-      
-      toast.error('Face recognition setup failed. Please try again.');
+      toast.error(error.userMessage || 'Face recognition setup failed. Please try again.');
     } finally {
       setIsProcessing(false);
       setFaceDetected(false);

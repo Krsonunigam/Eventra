@@ -201,7 +201,7 @@ const CertificateVerify = () => {
         </motion.div>
         
         <p className="text-center mt-8 text-gray-700 font-mono text-[10px]">
-          CID: {code} // NODE: {window.location.hostname}
+          CID: {code} <span aria-hidden="true">/</span><span aria-hidden="true">/</span> NODE: {window.location.hostname}
         </p>
       </div>
     </div>

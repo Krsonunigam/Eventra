@@ -95,8 +95,19 @@ const AdminReports = () => {
 
       toast.success(`Report exported as ${format.toUpperCase()}`);
     } catch (error) {
-      
       toast.error('Failed to export report');
+    }
+  };
+
+  const handleApproveBooking = async (id) => {
+    if (window.confirm("Are you sure you want to manually approve this booking?")) {
+      try {
+        await api.put(`/api/admin/bookings/${id}/approve`);
+        toast.success("Booking manually approved successfully!");
+        fetchReportsData(); // Refresh the list
+      } catch (error) {
+        toast.error(error.response?.data?.message || "Failed to approve booking");
+      }
     }
   };
 
@@ -388,10 +399,19 @@ const AdminReports = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                       {formatDate(booking.createdAt)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button className="text-cyan-400 hover:text-cyan-300 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap flex items-center space-x-3">
+                      <button className="text-cyan-400 hover:text-cyan-300 transition-colors" title="View Details">
                         <Eye className="h-4 w-4" />
                       </button>
+                      {booking.status === 'pending' && (
+                        <button
+                          onClick={() => handleApproveBooking(booking._id)}
+                          className="text-green-400 hover:text-green-300 transition-colors"
+                          title="Approve Booking"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </button>
+                      )}
                     </td>
                   </motion.tr>
                 ))}

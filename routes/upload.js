@@ -1,85 +1,55 @@
-// routes/upload.js
 const express = require('express');
 const multer = require('multer');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const cloudinary = require('../config/cloudinary');
 const { auth } = require('../middleware/auth');
+const { uploadBufferToCloudinary } = require('../utils/cloudinaryUpload');
 
 const router = express.Router();
 
-// 🔥 Cloudinary storage
-const profileStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'eventra/profiles',
-    allowed_formats: ['jpg', 'jpeg', 'png'],
-  },
-});
-
-const eventStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'eventra/events',
-    allowed_formats: ['jpg', 'jpeg', 'png'],
-  },
-});
-
-const signatureStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'eventra/signatures',
-    allowed_formats: ['jpg', 'jpeg', 'png'],
-  },
-});
-
-const uploadProfile = multer({
-  storage: profileStorage,
-  limits: { fileSize: 20 * 1024 * 1024 },
-});
-
-const uploadEvent = multer({
-  storage: eventStorage,
-  limits: { fileSize: 20 * 1024 * 1024 },
-});
-
-const uploadSignature = multer({
-  storage: signatureStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // Smaller limit for signatures
-});
-
-// ✅ Profile image
-router.post('/profile', auth, uploadProfile.single('profilePicture'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: 'No file uploaded' });
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype?.startsWith('image/')) return cb(new Error('Only image files are allowed'));
+    cb(null, true);
   }
+});
 
-  return res.json({
+const uploadToFolder = (fieldName, folder) => (req, res, next) => {
+  imageUpload.single(fieldName)(req, res, async (error) => {
+    if (error) return next(error);
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+    try {
+      const result = await uploadBufferToCloudinary(req.file.buffer, { folder });
+      req.uploadedImage = result;
+      next();
+    } catch (uploadError) {
+      next(uploadError);
+    }
+  });
+};
+
+router.post('/profile', auth, uploadToFolder('profilePicture', 'eventra/profiles'), (req, res) => {
+  res.json({
     message: 'Uploaded successfully',
-    url: req.file.path, // 🔥 Cloudinary URL
+    url: req.uploadedImage.secure_url,
+    public_id: req.uploadedImage.public_id
   });
 });
 
-// ✅ Event image
-router.post('/event', auth, uploadEvent.single('eventImage'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: 'No file uploaded' });
-  }
-
-  return res.json({
+router.post('/event', auth, uploadToFolder('eventImage', 'eventra/events'), (req, res) => {
+  res.json({
     message: 'Uploaded successfully',
-    url: req.file.path, // 🔥 Cloudinary URL
+    url: req.uploadedImage.secure_url,
+    public_id: req.uploadedImage.public_id
   });
 });
 
-// ✅ Certificate signature
-router.post('/signature', auth, uploadSignature.single('signatureImage'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: 'No file uploaded' });
-  }
-
-  return res.json({
+router.post('/signature', auth, uploadToFolder('signatureImage', 'eventra/signatures'), (req, res) => {
+  res.json({
     message: 'Uploaded successfully',
-    url: req.file.path, // 🔥 Cloudinary URL
+    url: req.uploadedImage.secure_url,
+    public_id: req.uploadedImage.public_id
   });
 });
 

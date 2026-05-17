@@ -1,7 +1,10 @@
 const sgMail = require("@sendgrid/mail");
 const nodemailer = require('nodemailer');
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+const hasSendGrid = Boolean(process.env.SENDGRID_API_KEY?.startsWith('SG.'));
+if (hasSendGrid) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+}
 
 // Nodemailer transporter (Gmail SMTP - primary for OTP)
 const createNodemailerTransporter = () => nodemailer.createTransport({
@@ -134,7 +137,7 @@ const sendBookingConfirmation = async (email, name, event, booking, pdf) => {
       ] : []
     };
 
-    await sgMail.send(msg);
+    if (hasSendGrid) await sgMail.send(msg);
     
   } catch (err) {
     
@@ -176,7 +179,7 @@ const sendEventNotification = async (email, name, eventTitle, date, venue) => {
       html
     };
 
-    await sgMail.send(msg);
+    if (hasSendGrid) await sgMail.send(msg);
     
   } catch (err) {
     
@@ -245,6 +248,10 @@ const sendResetOTP = async (email, otp) => {
 
   // Fallback to SendGrid
   try {
+    if (!hasSendGrid) {
+      throw new Error('SendGrid API key is not configured');
+    }
+
     await sgMail.send({
       to: email,
       from: { email: process.env.EMAIL_FROM || 'notifications@eventra.com', name: 'Eventra Security' },
@@ -259,7 +266,7 @@ const sendResetOTP = async (email, otp) => {
 };
 
 const sendCertificateEmail = async (email, name, eventTitle, certificateId, verificationCode, pdfBuffer) => {
-  const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+  const clientUrl = process.env.CLIENT_URL || 'https://eventraind.onrender.com';
   const verifyUrl = `${clientUrl}/verify-certificate/${verificationCode}`;
 
   const html = `

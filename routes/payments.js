@@ -1,6 +1,7 @@
 const express = require('express');
 const Booking = require('../models/Booking');
 const Event = require('../models/Event');
+const Payment = require('../models/Payment');
 const { auth } = require('../middleware/auth');
 const { createOrder, verifyPayment, refundPayment } = require('../utils/paymentService');
 const { sendBookingConfirmation } = require('../utils/emailService');
@@ -108,8 +109,21 @@ router.post('/verify', auth, async (req, res) => {
     booking.razorpayPaymentId = razorpay_payment_id;
     booking.razorpaySignature = razorpay_signature;
     booking.paymentId = razorpay_payment_id;
+    booking.paymentDate = new Date();
 
     await booking.save();
+
+    await Payment.create({
+      user: booking.user,
+      event: booking.event,
+      booking: booking._id,
+      amount: booking.totalAmount,
+      status: 'success',
+      provider: 'razorpay',
+      razorpayOrderId: razorpay_order_id,
+      razorpayPaymentId: razorpay_payment_id,
+      paidAt: new Date()
+    });
 
     // Update event available seats
     const event = await Event.findById(booking.event);

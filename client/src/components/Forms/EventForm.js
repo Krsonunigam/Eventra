@@ -15,8 +15,6 @@ import {
   X,
   Upload
 } from 'lucide-react';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
 
 const EventForm = ({ initialData = null, onSubmit, loading = false }) => {
   const [scheduleItems, setScheduleItems] = useState(
@@ -181,20 +179,11 @@ const EventForm = ({ initialData = null, onSubmit, loading = false }) => {
               control={control}
               rules={{ required: 'Description is required' }}
               render={({ field }) => (
-                <ReactQuill
+                <textarea
                   {...field}
-                  theme="snow"
-                  className="bg-gray-700 rounded-lg"
-                  style={{ color: 'white' }}
-                  modules={{
-                    toolbar: [
-                      [{ 'header': [1, 2, 3, false] }],
-                      ['bold', 'italic', 'underline'],
-                      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                      ['link'],
-                      ['clean']
-                    ]
-                  }}
+                  rows={8}
+                  className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-y"
+                  placeholder="Describe the event, agenda, audience, and key takeaways"
                 />
               )}
             />

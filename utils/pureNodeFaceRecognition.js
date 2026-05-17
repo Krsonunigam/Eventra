@@ -153,25 +153,38 @@ class PureNodeFaceRecognition {
         try {
             // Extract image features instead of just hash
             const features = await this.extractImageFeatures(imageBuffer);
+            if (!features || features.length < 98) {
+                return null;
+            }
+
             const brightness = await this.calculateBrightness(imageBuffer);
             const contrast = await this.calculateContrast(imageBuffer);
             
             // More lenient validation - allow wider range of brightness
             if (brightness < 0.02 || brightness > 0.98) {
-                
                 return null;
             }
             
             // Check for reasonable contrast (more lenient)
             if (contrast < 0.05) {
-                
                 return null;
             }
             
+            // Scientific face presence check: check edge density and biometric variance
+            const edgeFeatures = features.slice(64, 80);
+            const biometricFeatures = features.slice(92, 98);
+            const edgeCount = edgeFeatures.filter(f => f === 1).length;
+            const std1 = biometricFeatures[1];
+            const std2 = biometricFeatures[3];
+            const std3 = biometricFeatures[5];
+            const avgBiometricStd = (std1 + std2 + std3) / 3;
+
+            // Flat walls, ceilings, and empty frames have very low edges and region variance
+            if (edgeCount < 3 && avgBiometricStd < 0.04) {
+                return null; // Reject as empty/non-face frame
+            }
+
             const quality = this.calculateQuality(imageBuffer, brightness, contrast);
-            
-            
-            
             
             return {
                 features,
@@ -181,7 +194,6 @@ class PureNodeFaceRecognition {
                 hash: this.calculateImageHash(imageBuffer) // Keep for backward compatibility
             };
         } catch (error) {
-            
             return null;
         }
     }

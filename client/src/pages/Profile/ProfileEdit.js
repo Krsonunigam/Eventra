@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import UserProfileForm from '../../components/Forms/UserProfileForm';
 import useCustomToast from '../../utils/customToast';
+import { API_BASE_URL } from '../../config/api';
 
 const ProfileEdit = () => {
   const toast = useCustomToast();
@@ -21,7 +22,7 @@ const ProfileEdit = () => {
         const imageFormData = new FormData();
         imageFormData.append('profilePicture', formData.profileImage);
 
-        const uploadResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/upload/profile`, {
+        const uploadResponse = await fetch(`${API_BASE_URL}/api/upload/profile`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,

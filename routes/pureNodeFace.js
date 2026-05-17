@@ -14,6 +14,27 @@ const {
 } = require('../utils/pureNodeFaceRecognition');
 const User = require('../models/User');
 
+// POST /api/pure-face/detect - Detect if a face is in the single frame
+router.post('/detect', auth, async (req, res) => {
+    try {
+        const { faceData } = req.body;
+        if (!faceData) {
+            return res.status(400).json({ success: false, message: 'Missing faceData' });
+        }
+
+        const processedImage = await pureNodeFaceRecognition.processImage(faceData);
+        const face = await pureNodeFaceRecognition.detectFace(processedImage);
+
+        if (!face) {
+            return res.json({ success: true, hasFace: false });
+        }
+
+        return res.json({ success: true, hasFace: true, quality: face.quality });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // POST /api/pure-face/collect - Collect face samples for training
 router.post('/collect', auth, async (req, res) => {
     try {

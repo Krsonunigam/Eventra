@@ -47,7 +47,7 @@ const EventDetail = () => {
       setCheckingBooking(true);
       const response = await api.get('/api/bookings');
       const bookings = response.data.bookings || [];
-      const booked = bookings.some(b => b.event?._id === id && (b.status === 'confirmed' || b.status === 'pending'));
+      const booked = bookings.some(b => b.event?._id === id && b.status === 'confirmed');
       setIsAlreadyBooked(booked);
     } catch (error) {
       

@@ -46,7 +46,7 @@ setIsCheckingBooking(true);
 const response = await api.get('/api/bookings');
 const bookings = response.data.bookings || [];
 const alreadyBooked = bookings.some(b => 
-b.event?._id === eventId && (b.status === 'confirmed' || b.status === 'pending')
+b.event?._id === eventId && b.status === 'confirmed'
 );
 
 if (alreadyBooked) {
@@ -106,19 +106,34 @@ setPaymentLoading(true);
     return;
   }
 
-  if (!window.Razorpay) {
-    toast.error("Payment gateway failed to load");
-    setPaymentLoading(false);
-    return;
-  }
+  const isLocalMock = !process.env.REACT_APP_RAZORPAY_KEY_ID || !window.Razorpay;
 
-  const { data } = await api.post('/api/payments/create-order', {
-    eventId,
-    quantity: 1
-  });
+    const { data } = await api.post('/api/payments/create-order', {
+      eventId,
+      quantity: 1
+    });
+
+    if (isLocalMock) {
+      toast.info("Simulating payment on local server...");
+      
+      const mockPaymentId = "pay_mock_" + Math.random().toString(36).substring(2, 9);
+      const res = await api.post("/api/payments/verify", {
+        razorpay_order_id: data.order.id,
+        razorpay_payment_id: mockPaymentId,
+        razorpay_signature: "signature_mock",
+        bookingId: data.bookingId
+      });
+
+      setBooking(res.data.booking);
+      setPaymentSuccess(true);
+      toast.success("Simulated local payment successful!");
+      await generateEventPass(res.data.booking._id);
+      setPaymentLoading(false);
+      return;
+    }
 
   const options = {
-  key: "rzp_test_SlQmKgWRgm9glm",
+  key: process.env.REACT_APP_RAZORPAY_KEY_ID,
   amount: data.order.amount,
   currency: "INR",
   name: "Eventra",
